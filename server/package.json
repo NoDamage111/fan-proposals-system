@@ -1,0 +1,26 @@
+{
+  "name": "fan-proposals-server",
+  "version": "1.0.0",
+  "description": "Backend for fan proposals application",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "nodemon index.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.39.0",
+    "axios": "^1.9.0",
+    "canvas": "^3.1.0",
+    "chart.js": "^4.5.0",
+    "chartjs-node-canvas": "^5.0.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "jspdf": "^2.5.1",
+    "morgan": "^1.10.0",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2"
+  }
+}
