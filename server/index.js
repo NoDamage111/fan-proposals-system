@@ -130,8 +130,8 @@ async function plotTwoCurvesToJPG(dataset1, dataset2, dataset3, dataset4, output
     const chart = new QuickChart();
     
     // Правильный размер 400x600 px
-    const chartWidth = 400;
-    const chartHeight = 600;
+    const chartWidth = 450;
+    const chartHeight = 500;
     
     // Вычисляем границы данных для правильного масштабирования
     const allDataPoints = [...dataset1, ...dataset2, ...dataset3, ...dataset4];
