@@ -123,7 +123,6 @@ async function loadFiveData(EXCEL_FILE_PATH) {
   }
 }
 
-// Улучшенная функция генерации графиков с гладкими линиями
 // Улучшенная функция генерации графиков с правильным размером
 async function plotTwoCurvesToJPG(dataset1, dataset2, dataset3, dataset4, outputPath, options = {}) {
   try {
