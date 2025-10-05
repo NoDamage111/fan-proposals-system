@@ -2,11 +2,10 @@ import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import { createClient } from '@supabase/supabase-js';
-import { ChartJSNodeCanvas } from 'chartjs-node-canvas';
+import QuickChart from 'quickchart-js';
 import axios from 'axios';
 import XLSX from 'xlsx';
 import path from 'path';
-import fs from 'fs';
 import { fileURLToPath } from 'url';
 
 // ES modules equivalent for __dirname
@@ -103,94 +102,101 @@ async function loadFiveData(EXCEL_FILE_PATH) {
   }
 }
 
-// Функция генерации графиков
+// Новая функция генерации графиков с QuickChart
 async function plotTwoCurvesToJPG(dataset1, dataset2, dataset3, dataset4, outputPath, options = {}) {
-  const width = 450;
-  const height = 500;
-
-  const chartJSNodeCanvas = new ChartJSNodeCanvas({ width, height, backgroundColour: 'white' });
-
-  const configuration = {
-    type: 'scatter',
-    data: {
-      datasets: [
-        {
-          label: options.label1 || 'Заданные точки',
-          data: dataset1,
-          backgroundColor: '#4BC0C0',
-          borderColor: '#4BC0C0',
-          borderWidth: 2,
-          pointRadius: 0.5,
-          showLine: true,
-          tension: 0.1
-        },
-        {
-          label: options.label2 || 'Интерполяция',
-          data: dataset2,
-          backgroundColor: '#FF6384',
-          borderColor: '#FF6384',
-          borderWidth: 2,
-          pointRadius: 0.5,
-          showLine: true,
-          tension: 0.1
-        },
-        {
-          label: options.label3 || 'CrossPoint',
-          data: dataset3,
-          backgroundColor: '#1F6386',
-          borderColor: '#1F6386',
-          borderWidth: 2,
-          pointRadius: 3,
-          showLine: true,
-          tension: 0.1
-        },
-        {
-          label: options.label4 || 'ReqPoint',
-          data: dataset4,
-          backgroundColor: '#117722ff',
-          borderColor: '#16753bff',
-          borderWidth: 2,
-          pointRadius: 3,
-          showLine: true,
-          tension: 0.1
-        }
-      ]
-    },
-    options: {
-      responsive: false,
-      scales: {
-        x: {
-          type: 'linear',
-          title: {
-            display: !!options.xLabel,
-            text: options.xLabel || 'X Axis'
+  try {
+    const chart = new QuickChart();
+    
+    // Преобразуем данные в формат для Chart.js
+    const chartData = {
+      type: 'scatter',
+      data: {
+        datasets: [
+          {
+            label: options.label1 || 'Заданные точки',
+            data: dataset1,
+            backgroundColor: '#4BC0C0',
+            borderColor: '#4BC0C0',
+            borderWidth: 2,
+            pointRadius: 2,
+            showLine: true,
+            tension: 0.1
+          },
+          {
+            label: options.label2 || 'Интерполяция',
+            data: dataset2,
+            backgroundColor: '#FF6384',
+            borderColor: '#FF6384',
+            borderWidth: 2,
+            pointRadius: 1,
+            showLine: true,
+            tension: 0.1
+          },
+          {
+            label: options.label3 || 'CrossPoint',
+            data: dataset3,
+            backgroundColor: '#1F6386',
+            borderColor: '#1F6386',
+            borderWidth: 3,
+            pointRadius: 4,
+            showLine: false
+          },
+          {
+            label: options.label4 || 'ReqPoint',
+            data: dataset4,
+            backgroundColor: '#117722',
+            borderColor: '#16753b',
+            borderWidth: 3,
+            pointRadius: 4,
+            showLine: false
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        scales: {
+          x: {
+            type: 'linear',
+            title: {
+              display: true,
+              text: options.xLabel || 'Производительность, м³/ч'
+            }
+          },
+          y: {
+            title: {
+              display: true,
+              text: options.yLabel || 'Давление, Па'
+            },
+            beginAtZero: false
           }
         },
-        y: {
+        plugins: {
           title: {
-            display: !!options.yLabel,
-            text: options.yLabel || 'Y Axis'
+            display: true,
+            text: options.title || 'Аэродинамическая характеристика'
           },
-          beginAtZero: false
-        }
-      },
-      plugins: {
-        title: {
-          display: !!options.title,
-          text: options.title || ''
+          legend: {
+            display: true,
+            position: 'top'
+          }
         }
       }
-    }
-  };
+    };
 
-  try {
-    const imageBase64 = await chartJSNodeCanvas.renderToDataURL(configuration);
+    chart.setConfig(chartData);
+    chart.setWidth(800);
+    chart.setHeight(600);
+    chart.setBackgroundColor('white');
 
+    // Получаем URL изображения
+    const imageUrl = await chart.getShortUrl();
+    
     return {
       success: true,
       graph: {
-        base64: imageBase64,
-        format: 'image/jpeg',
+        url: imageUrl,
+        base64: null, // QuickChart не возвращает base64 напрямую
+        format: 'image/png',
         additionalData: {
           pointsCount: dataset1.length + dataset2.length + dataset3.length,
           createdAt: new Date().toISOString()
@@ -199,13 +205,31 @@ async function plotTwoCurvesToJPG(dataset1, dataset2, dataset3, dataset4, output
     };
   } catch (error) {
     console.error('Ошибка генерации графика:', error);
+    
+    // Fallback - возвращаем данные для построения графика на клиенте
     return {
-      success: false,
-      error: error.message
+      success: true,
+      graph: {
+        data: {
+          datasets: [
+            { label: 'Заданные точки', data: dataset1 },
+            { label: 'Интерполяция', data: dataset2 },
+            { label: 'CrossPoint', data: dataset3 },
+            { label: 'ReqPoint', data: dataset4 }
+          ]
+        },
+        options: {
+          title: options.title || 'Аэродинамическая характеристика',
+          xLabel: options.xLabel || 'Производительность, м³/ч',
+          yLabel: options.yLabel || 'Давление, Па'
+        },
+        format: 'data' // указываем, что это данные для графика
+      }
     };
   }
 }
 
+// Остальные функции остаются без изменений
 function leastSquaresInterpolation(points, degree) {
   let X = [];
   let Y = [];
@@ -371,6 +395,8 @@ app.post('/api/fans/select', async (req, res) => {
 
     const { flow_rate, pressure, system, quantity, type, series, execution, climate, position, rotation, fluctuationPercentUp, fluctuationPercentDown, powerReserve, typeOfMotor, temperature, height, minFreq, maxFreq, calcType, startType, five, notice } = req.body
 
+    console.log('Получен запрос на подбор:', { flow_rate, pressure, type, series });
+
     if (type) {
       filteredFans = filteredFans.filter(fan => fan['Тип вентилятора'] === type)
     }
@@ -395,6 +421,8 @@ app.post('/api/fans/select', async (req, res) => {
         fan['Макс. давление, Па'] >= pressure
       )
     }
+
+    console.log(`После фильтрации осталось: ${filteredFans.length} вентиляторов`);
 
     filteredFans = filteredFans.filter(fan => {
       baseCurveArray = getArrayCurve(fan, 'Расход ', ', м<sup>3</sup>/ч', 'Давление ', ', Па')
@@ -433,11 +461,11 @@ app.post('/api/fans/select', async (req, res) => {
       return true
     })
 
-    // Обработка разных типов подбора (стандартный, с ПЧ, схема 5)
-    // Убедитесь, что все вызовы plotTwoCurvesToJPG используют await
-    
+    console.log(`После расчета характеристик осталось: ${filteredFans.length} вентиляторов`);
+
+    // Обработка стандартного подбора
     if (startType != "Частотный преобразователь" && five == false) {
-      console.log("Standart");
+      console.log("Standart подбор");
       filteredFans = filteredFans.filter(fan =>
         fan['Исполнение 5 радиального вентилятора (ременная передача)'] != true
       )
@@ -494,7 +522,7 @@ app.post('/api/fans/select', async (req, res) => {
         continue
        }
 
-        // Используем await для асинхронной функции
+        // Генерируем график
         fan.graph = await plotTwoCurvesToJPG(
           fan.baseCurveArray,
           fan.curveArray,
@@ -512,13 +540,14 @@ app.post('/api/fans/select', async (req, res) => {
       }
     }
 
-    // Добавьте аналогичные блоки для других типов подбора с await
-    
-    console.log(result.length);
+    console.log(`Найдено результатов: ${result.length}`);
     res.json(result.length > 0 ? result : [])
   } catch (error) {
     console.error('Ошибка подбора вентиляторов:', error);
-    res.status(500).json({ error: 'Ошибка подбора вентиляторов' });
+    res.status(500).json({ 
+      error: 'Ошибка подбора вентиляторов',
+      message: error.message 
+    });
   }
 });
 
