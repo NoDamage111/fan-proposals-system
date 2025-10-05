@@ -1,5 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router';
-import { supabase } from '@/supabase' // Добавляем импорт supabase
+import { supabase } from '@/supabase'
 
 // Импорт компонентов страниц
 import LoginView from '@/views/LoginView.vue';
@@ -14,13 +14,13 @@ const router = createRouter({
       path: '/login',
       name: 'login',
       component: LoginView,
-      meta: { requiresAuth: false } // Не требует авторизации
+      meta: { requiresAuth: false }
     },
     {
       path: '/proposals',
       name: 'proposals',
       component: ProposalsView,
-      meta: { requiresAuth: true } // Требует авторизации
+      meta: { requiresAuth: true }
     },
     {
       path: '/proposals/new',
@@ -31,17 +31,17 @@ const router = createRouter({
     {
       path: '/proposals/:id',
       name: 'proposal-detail',
-      component: ProposalDetailView, // Теперь указывает на index.vue в папке
+      component: ProposalDetailView,
       meta: { requiresAuth: true }
     },
     {
       path: '/',
-      redirect: '/proposals' // Перенаправление с корня
+      redirect: '/proposals'
     }
   ]
 });
 
-// Глобальный навигационный гард
+// Упрощенный навигационный гард
 router.beforeEach(async (to, from, next) => {
   const requiresAuth = to.matched.some(record => record.meta.requiresAuth)
   
@@ -50,16 +50,12 @@ router.beforeEach(async (to, from, next) => {
   }
   
   try {
-    const token = localStorage.getItem('supabase.auth.token')
+    const { data: { user }, error } = await supabase.auth.getUser()
     
-    if (!token) {
+    if (error) {
+      console.error('Auth check error:', error)
       return next('/login')
     }
-    
-    // Проверяем токен через Supabase напрямую
-    const { data: { user }, error } = await supabase.auth.getUser(token)
-    
-    if (error) throw error
     
     if (user) {
       return next()
@@ -67,7 +63,7 @@ router.beforeEach(async (to, from, next) => {
       return next('/login')
     }
   } catch (error) {
-    console.error('Auth check error:', error)
+    console.error('Auth check failed:', error)
     return next('/login')
   }
 })

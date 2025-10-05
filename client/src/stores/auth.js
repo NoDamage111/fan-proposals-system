@@ -22,7 +22,6 @@ export const useAuthStore = defineStore('auth', {
         if (error) throw error
         
         this.user = data.user
-        localStorage.setItem('supabase.auth.token', data.session.access_token)
         return data.user
       } catch (error) {
         this.error = error.message
@@ -41,7 +40,6 @@ export const useAuthStore = defineStore('auth', {
         if (error) throw error
         
         this.user = null
-        localStorage.removeItem('supabase.auth.token')
       } catch (error) {
         this.error = error.message
         throw error
@@ -51,22 +49,20 @@ export const useAuthStore = defineStore('auth', {
     },
     
     async checkAuth() {
-      const token = localStorage.getItem('supabase.auth.token')
-      
-      if (!token) {
-        this.user = null
-        return null
-      }
-      
       try {
-        const { data: { user }, error } = await supabase.auth.getUser(token)
-        if (error) throw error
+        const { data: { user }, error } = await supabase.auth.getUser()
+        
+        if (error) {
+          console.error('Auth check error:', error)
+          this.user = null
+          return null
+        }
         
         this.user = user
         return user
       } catch (error) {
+        console.error('Auth check failed:', error)
         this.user = null
-        localStorage.removeItem('supabase.auth.token')
         return null
       }
     }

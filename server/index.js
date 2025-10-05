@@ -17,6 +17,13 @@ const PORT = process.env.PORT || 3001;
 
 // Middleware
 
+app.use((req, res, next) => {
+  console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`)
+  console.log('Origin:', req.headers.origin)
+  console.log('Headers:', req.headers)
+  next()
+})
+
 app.use(cors({
   origin: [
     'http://localhost:5173',
