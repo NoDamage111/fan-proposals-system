@@ -150,7 +150,7 @@
     id="fan-dialog-image"
     :src="selectedFanData?.fan_data?.graph?.graph?.base64 || selectedFanData?.fan_data?.graph?.graph?.url" 
     alt="Аэродинамическая характеристика"
-    style="max-width: 100%; height: auto;"
+    style="max-width: 600; height: auto;"
     @error="handleImageError"
   />
 </div>
@@ -331,9 +331,7 @@ const loadImageAsArrayBuffer = async (imageUrl) => {
   }
 }
 
-// Функция для генерации RTF с колонтитулами и исходной кодировкой
-// Функция для генерации RTF с колонтитулами и исходной кодировкой
-// Функция для генерации RTF с колонтитулами и исходной кодировкой
+
 // Функция для генерации RTF с колонтитулами и исходной кодировкой
 const generateRTF = async () => {
   isGeneratingRTF.value = true
@@ -979,6 +977,14 @@ const calculateTotal = () => {
   background-color: #f5f5f5;
   border-radius: 4px;
   padding: 16px;
-  min-height: 300px;
+  width: 400px;
+  height: 600px;
+  margin: 0 auto;
+}
+
+.chart-container img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
 }
 </style>

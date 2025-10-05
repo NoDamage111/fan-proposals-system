@@ -696,10 +696,18 @@ const handleSubmit = async () => {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  max-height: 800px;
+  width: 400px;
+  height: 600px;
   background-color: #f5f5f5;
   border-radius: 4px;
   color: #666;
+  margin: 0 auto;
+}
+
+.chart-placeholder img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
 }
 
 .additional-options {

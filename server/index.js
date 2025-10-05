@@ -124,9 +124,14 @@ async function loadFiveData(EXCEL_FILE_PATH) {
 }
 
 // Улучшенная функция генерации графиков с гладкими линиями
+// Улучшенная функция генерации графиков с правильным размером
 async function plotTwoCurvesToJPG(dataset1, dataset2, dataset3, dataset4, outputPath, options = {}) {
   try {
     const chart = new QuickChart();
+    
+    // Правильный размер 400x600 px
+    const chartWidth = 400;
+    const chartHeight = 600;
     
     // Создаем гладкие линии с cubic interpolation
     const chartConfig = {
@@ -138,7 +143,7 @@ async function plotTwoCurvesToJPG(dataset1, dataset2, dataset3, dataset4, output
             data: dataset1,
             backgroundColor: 'rgba(75, 192, 192, 0.1)',
             borderColor: '#4BC0C0',
-            borderWidth: 3,
+            borderWidth: 2,
             pointRadius: 0, // Убираем точки для гладкости
             pointHoverRadius: 3,
             fill: false,
@@ -150,7 +155,7 @@ async function plotTwoCurvesToJPG(dataset1, dataset2, dataset3, dataset4, output
             data: dataset2,
             backgroundColor: 'rgba(255, 99, 132, 0.1)',
             borderColor: '#FF6384',
-            borderWidth: 2,
+            borderWidth: 1,
             pointRadius: 0,
             pointHoverRadius: 2,
             fill: false,
@@ -163,9 +168,9 @@ async function plotTwoCurvesToJPG(dataset1, dataset2, dataset3, dataset4, output
             data: dataset3,
             backgroundColor: '#1F6386',
             borderColor: '#1F6386',
-            borderWidth: 4,
-            pointRadius: 6,
-            pointHoverRadius: 8,
+            borderWidth: 3,
+            pointRadius: 5,
+            pointHoverRadius: 7,
             showLine: false, // Только точки для рабочих точек
             pointStyle: 'circle'
           },
@@ -174,16 +179,17 @@ async function plotTwoCurvesToJPG(dataset1, dataset2, dataset3, dataset4, output
             data: dataset4,
             backgroundColor: '#117722',
             borderColor: '#16753b',
-            borderWidth: 4,
-            pointRadius: 6,
-            pointHoverRadius: 8,
+            borderWidth: 3,
+            pointRadius: 5,
+            pointHoverRadius: 7,
             showLine: false,
             pointStyle: 'rect'
           }
         ]
       },
       options: {
-        responsive: true,
+        responsive: false, // Отключаем responsive для фиксированного размера
+        maintainAspectRatio: false,
         interaction: {
           intersect: false,
           mode: 'index'
@@ -195,12 +201,17 @@ async function plotTwoCurvesToJPG(dataset1, dataset2, dataset3, dataset4, output
               display: true,
               text: options.xLabel || 'Производительность, м³/ч',
               font: {
-                size: 14,
+                size: 12,
                 weight: 'bold'
               }
             },
             grid: {
               color: 'rgba(0,0,0,0.1)'
+            },
+            ticks: {
+              font: {
+                size: 10
+              }
             }
           },
           y: {
@@ -208,14 +219,19 @@ async function plotTwoCurvesToJPG(dataset1, dataset2, dataset3, dataset4, output
               display: true,
               text: options.yLabel || 'Давление, Па',
               font: {
-                size: 14,
+                size: 12,
                 weight: 'bold'
               }
             },
             grid: {
               color: 'rgba(0,0,0,0.1)'
             },
-            beginAtZero: false
+            beginAtZero: false,
+            ticks: {
+              font: {
+                size: 10
+              }
+            }
           }
         },
         plugins: {
@@ -223,20 +239,21 @@ async function plotTwoCurvesToJPG(dataset1, dataset2, dataset3, dataset4, output
             display: true,
             text: options.title || 'Аэродинамическая характеристика',
             font: {
-              size: 16,
+              size: 14,
               weight: 'bold'
             },
-            padding: 20
+            padding: 15
           },
           legend: {
             display: true,
             position: 'top',
             labels: {
               usePointStyle: true,
-              padding: 20,
+              padding: 15,
               font: {
-                size: 12
-              }
+                size: 11
+              },
+              boxWidth: 12
             }
           },
           tooltip: {
@@ -244,19 +261,27 @@ async function plotTwoCurvesToJPG(dataset1, dataset2, dataset3, dataset4, output
             intersect: false,
             backgroundColor: 'rgba(0,0,0,0.8)',
             titleFont: {
-              size: 12
+              size: 11
             },
             bodyFont: {
-              size: 11
+              size: 10
             }
+          }
+        },
+        layout: {
+          padding: {
+            top: 10,
+            right: 10,
+            bottom: 10,
+            left: 10
           }
         }
       }
     };
 
     chart.setConfig(chartConfig);
-    chart.setWidth(1000);
-    chart.setHeight(700);
+    chart.setWidth(chartWidth);
+    chart.setHeight(chartHeight);
     chart.setBackgroundColor('white');
 
     // Получаем URL изображения
@@ -278,7 +303,9 @@ async function plotTwoCurvesToJPG(dataset1, dataset2, dataset3, dataset4, output
         url: imageUrl,
         base64: base64Image,
         format: 'image/png',
-        config: chartConfig, // Сохраняем конфиг для возможного перестроения
+        width: chartWidth,
+        height: chartHeight,
+        config: chartConfig,
         additionalData: {
           pointsCount: dataset1.length + dataset2.length + dataset3.length,
           createdAt: new Date().toISOString()
