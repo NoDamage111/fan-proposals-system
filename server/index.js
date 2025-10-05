@@ -16,11 +16,13 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 
 // Middleware
+
+const allowedOrigins = process.env.CORS_ORIGIN ? 
+  process.env.CORS_ORIGIN.split(',') : 
+  ['http://localhost:5173'];
+
 app.use(cors({
-  origin: [
-    'http://localhost:5173',
-    'https://your-frontend-domain.vercel.app' // замените на реальный домен
-  ],
+  origin: allowedOrigins,
   credentials: true
 }));
 app.use(express.json());

@@ -1,7 +1,3 @@
-import { defineConfig } from 'vite'
-import vue from '@vitejs/plugin-vue'
-import { fileURLToPath, URL } from 'node:url'
-
 export default defineConfig({
   plugins: [vue()],
   resolve: {
@@ -12,10 +8,10 @@ export default defineConfig({
   server: {
     proxy: {
       '/api': {
-        target: 'http://localhost:3001', // Убедитесь, что порт совпадает с сервером
+        target: process.env.VITE_API_URL || 'http://localhost:3001',
         changeOrigin: true,
         secure: false,
-        rewrite: (path) => path.replace(/^\/api/,'')
+        rewrite: (path) => path.replace(/^\/api/, '')
       }
     }
   }

@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: fan-proposals-backend
+    env: node
+    plan: free
+    buildCommand: npm install
+    startCommand: node index.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: SUPABASE_URL
+        fromDatabase:
+          name: supabase-config
+          property: url
+      - key: SUPABASE_SERVICE_KEY
+        fromDatabase:
+          name: supabase-config
+          property: service_key

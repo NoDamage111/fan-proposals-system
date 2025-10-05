@@ -1,8 +1,7 @@
 {
   "name": "fan-proposals-server",
   "version": "1.0.0",
-  "description": "Backend for fan proposals application",
-  "main": "index.js",
+  "type": "module",
   "scripts": {
     "start": "node index.js",
     "dev": "nodemon index.js"
@@ -19,8 +18,5 @@
     "jspdf": "^2.5.1",
     "morgan": "^1.10.0",
     "xlsx": "^0.18.5"
-  },
-  "devDependencies": {
-    "nodemon": "^3.0.2"
   }
 }
