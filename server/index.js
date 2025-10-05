@@ -120,7 +120,7 @@ async function loadFiveData(EXCEL_FILE_PATH,) {
   }
 }
 
-function plotTwoCurvesToJPG(dataset1, dataset2, dataset3, dataset4, outputPath, options = {}) {
+async function plotTwoCurvesToJPG(dataset1, dataset2, dataset3, dataset4, outputPath, options = {}) {
   const width = 450;
   const height = 500;
 
@@ -128,22 +128,22 @@ function plotTwoCurvesToJPG(dataset1, dataset2, dataset3, dataset4, outputPath, 
   const chartJSNodeCanvas = new ChartJSNodeCanvas({ width, height, backgroundColour: 'white' });
 
   const configuration = {
-    type: 'scatter', // Важно: используем точечный график!
+    type: 'scatter',
     data: {
       datasets: [
         {
           label: options.label1 || 'Заданные точки',
-          data: dataset1, // Массив точек {x, y}
+          data: dataset1,
           backgroundColor: '#4BC0C0',
           borderColor: '#4BC0C0',
           borderWidth: 2,
           pointRadius: 0.5,
-          showLine: true, // Соединяем точки линией
+          showLine: true,
           tension: 0.1
         },
         {
           label: options.label2 || 'Интерполяция',
-          data: dataset2, // Массив точек {x, y}
+          data: dataset2,
           backgroundColor: '#FF6384',
           borderColor: '#FF6384',
           borderWidth: 2,
@@ -153,7 +153,7 @@ function plotTwoCurvesToJPG(dataset1, dataset2, dataset3, dataset4, outputPath, 
         },
         {
           label: options.label3 || 'CrossPoint',
-          data: dataset3, // Массив точек {x, y}
+          data: dataset3,
           backgroundColor: '#1F6386',
           borderColor: '#1F6386',
           borderWidth: 2,
@@ -163,7 +163,7 @@ function plotTwoCurvesToJPG(dataset1, dataset2, dataset3, dataset4, outputPath, 
         },
         {
           label: options.label4 || 'ReqPoint',
-          data: dataset4, // Массив точек {x, y}
+          data: dataset4,
           backgroundColor: '#117722ff',
           borderColor: '#16753bff',
           borderWidth: 2,
@@ -177,7 +177,7 @@ function plotTwoCurvesToJPG(dataset1, dataset2, dataset3, dataset4, outputPath, 
       responsive: false,
       scales: {
         x: {
-          type: 'linear', // Числовая ось X
+          type: 'linear',
           title: {
             display: !!options.xLabel,
             text: options.xLabel || 'X Axis'
@@ -201,7 +201,7 @@ function plotTwoCurvesToJPG(dataset1, dataset2, dataset3, dataset4, outputPath, 
   };
 
   try {
-    const imageBase64 = await chartJSNodeCanvas.renderToDataURL(configuration)
+    const imageBase64 = await chartJSNodeCanvas.renderToDataURL(configuration);
 
     return {
       success: true,
@@ -213,10 +213,13 @@ function plotTwoCurvesToJPG(dataset1, dataset2, dataset3, dataset4, outputPath, 
           createdAt: new Date().toISOString()
         }
       }
-    }
-  }
-  catch (error) {
-    console.error('Ошибка:', error);
+    };
+  } catch (error) {
+    console.error('Ошибка генерации графика:', error);
+    return {
+      success: false,
+      error: error.message
+    };
   }
 }
 
