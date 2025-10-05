@@ -1,10 +1,12 @@
 {
   "name": "fan-proposals-server",
   "version": "1.0.0",
-  "type": "module",
+  "description": "Backend for fan proposals application",
+  "main": "index.js",
   "scripts": {
     "start": "node index.js",
-    "dev": "nodemon index.js"
+    "dev": "nodemon index.js",
+    "render-build": "npm install"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.39.0",
@@ -18,5 +20,8 @@
     "jspdf": "^2.5.1",
     "morgan": "^1.10.0",
     "xlsx": "^0.18.5"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   }
 }

@@ -3,6 +3,8 @@ services:
     name: fan-proposals-backend
     env: node
     plan: free
+    branch: main
+    rootDir: server
     buildCommand: npm install
     startCommand: node index.js
     envVars:
@@ -10,9 +12,9 @@ services:
         value: production
       - key: SUPABASE_URL
         fromDatabase:
-          name: supabase-config
-          property: url
+          name: fan-proposals-config
+          property: supabase_url
       - key: SUPABASE_SERVICE_KEY
         fromDatabase:
-          name: supabase-config
-          property: service_key
+          name: fan-proposals-config
+          property: supabase_service_key
