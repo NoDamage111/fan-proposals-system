@@ -21,19 +21,39 @@ const PORT = process.env.PORT || 3001;
 
 // CORS middleware
 app.use(cors({
-  origin: [
-    'http://localhost:5173',
-    'https://fan-proposals.vercel.app',
-    'https://fan-proposals-system.vercel.app',
-    'https://*.vercel.app'
-  ],
+  origin: function (origin, callback) {
+    // Разрешаем запросы без origin (например, из мобильных приложений)
+    if (!origin) return callback(null, true);
+    
+    // Разрешаем локальную разработку
+    if (origin === 'http://localhost:5173') {
+      return callback(null, true);
+    }
+    
+    // Разрешаем все домены Vercel
+    if (
+      origin.endsWith('.vercel.app') ||
+      origin.endsWith('.now.sh') ||
+      origin.includes('fan-proposals-system') ||
+      origin.includes('fan-proposals-')
+    ) {
+      return callback(null, true);
+    }
+    
+    // Можно также разрешить все origins для разработки
+    // return callback(null, true);
+    
+    // Или отклонять другие домены
+    callback(new Error('Not allowed by CORS'));
+  },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'X-Requested-With'],
   credentials: true,
   preflightContinue: false,
   optionsSuccessStatus: 204
 }));
 
+// Явно обрабатываем OPTIONS запросы для всех routes
 app.options('*', cors());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));

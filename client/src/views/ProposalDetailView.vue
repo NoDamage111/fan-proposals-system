@@ -838,7 +838,7 @@ const generatePDF = async () => {
       width: 400,
       alignment: 'center',
       margin: [0, 20, 0, 10]
-    }
+    },
           {
             text: `Вентилятор: ${fanData['Модель колеса']}, скорость вращения: ${fanData.speed} об/мин`,
             style: 'imageCaption',
