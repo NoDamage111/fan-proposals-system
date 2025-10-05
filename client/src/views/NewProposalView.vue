@@ -570,7 +570,12 @@ const searchFans = async () => {
   hasSearched.value = true
 
   try {
-    const response = await fetch('http://localhost:3001/api/fans/select', {
+    // Используем относительный путь для продакшена
+    const apiUrl = import.meta.env.VITE_API_URL 
+      ? `${import.meta.env.VITE_API_URL}/api/fans/select`
+      : '/api/fans/select'
+
+    const response = await fetch(apiUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -590,7 +595,7 @@ const searchFans = async () => {
         fluctuationPercentDown: searchParams.value.fluctuationPercentDown,
         powerReserve: searchParams.value.powerReserve,
         typeOfMotor: searchParams.value.typeOfMotor,
-        temperature:searchParams.value.temperature,
+        temperature: searchParams.value.temperature,
         height: searchParams.value.height,
         minFreq: searchParams.value.minFreq,
         maxFreq: searchParams.value.maxFreq,
@@ -601,11 +606,14 @@ const searchFans = async () => {
       })
     })
     
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+    
     const data = await response.json()
     
     // Инициализируем дополнительные опции для каждого вентилятора
     searchResults.value = data.map(fan => initializeAdditionalOptions(fan))
-    
     
     if (data.length > 0) {
       // selectedFan.value = data[0]
