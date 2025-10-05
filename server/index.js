@@ -20,12 +20,15 @@ const PORT = process.env.PORT || 3001;
 app.use(cors({
   origin: [
     'http://localhost:5173',
-    'https://fan-proposals-frontend.vercel.app', // замените на реальный домен Vercel
+    'https://fan-proposals.vercel.app',
+    'https://fan-proposals-system.vercel.app',
     'https://*.vercel.app'
   ],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: true
+  allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
+  credentials: true,
+  preflightContinue: false,
+  optionsSuccessStatus: 204
 }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
@@ -35,7 +38,20 @@ app.get('/health', (req, res) => {
   res.status(200).json({ 
     status: 'OK', 
     timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV 
+    environment: process.env.NODE_ENV,
+    cors: 'enabled'
+  });
+});
+
+// Тестовый endpoint для проверки CORS
+app.get('/api/test-cors', (req, res) => {
+  res.json({ 
+    message: 'CORS is working!',
+    timestamp: new Date().toISOString(),
+    allowedOrigins: [
+      'https://fan-proposals.vercel.app',
+      'https://fan-proposals-system.vercel.app'
+    ]
   });
 });
 
@@ -44,6 +60,8 @@ const supabase = createClient(
   process.env.SUPABASE_URL, 
   process.env.SUPABASE_SERVICE_KEY
 );
+
+console.log('Server started with CORS enabled for Vercel domains');
 
 // Глобальная переменная для хранения данных
 let fansData = [];
@@ -718,4 +736,9 @@ app.get('/api/fans/structure', (req, res) => {
 // Запуск сервера
 app.listen(PORT, () => {
   console.log(`Сервер запущен на порту ${PORT}`);
+  console.log(`CORS разрешены для: ${[
+    'http://localhost:5173',
+    'https://fan-proposals.vercel.app', 
+    'https://fan-proposals-system.vercel.app'
+  ].join(', ')}`);
 });
