@@ -124,6 +124,7 @@ async function loadFiveData(EXCEL_FILE_PATH) {
 }
 
 // Улучшенная функция генерации графиков с правильным размером
+// Исправленная функция генерации графиков с полным отображением
 async function plotTwoCurvesToJPG(dataset1, dataset2, dataset3, dataset4, outputPath, options = {}) {
   try {
     const chart = new QuickChart();
@@ -132,148 +133,251 @@ async function plotTwoCurvesToJPG(dataset1, dataset2, dataset3, dataset4, output
     const chartWidth = 400;
     const chartHeight = 600;
     
-    // Создаем гладкие линии с cubic interpolation
+    // Вычисляем границы данных для правильного масштабирования
+    const allDataPoints = [...dataset1, ...dataset2, ...dataset3, ...dataset4];
+    const xValues = allDataPoints.map(point => point.x).filter(x => x != null);
+    const yValues = allDataPoints.map(point => point.y).filter(y => y != null);
+    
+    const minX = Math.min(...xValues);
+    const maxX = Math.max(...xValues);
+    const minY = Math.min(...yValues);
+    const maxY = Math.max(...yValues);
+    
+    // Добавляем отступы для лучшего отображения
+    const xPadding = (maxX - minX) * 0.1;
+    const yPadding = (maxY - minY) * 0.1;
+    
+    const xMin = Math.max(0, minX - xPadding); // Не ниже 0 для расхода
+    const xMax = maxX + xPadding;
+    const yMin = Math.max(0, minY - yPadding); // Не ниже 0 для давления
+    const yMax = maxY + yPadding;
+
+    // Полная конфигурация графика
     const chartConfig = {
       type: 'line',
       data: {
         datasets: [
+          // Основная характеристика вентилятора - сплошная линия
           {
-            label: options.label1 || 'Характеристика вентилятора',
+            label: 'Характеристика вентилятора',
             data: dataset1,
-            backgroundColor: 'rgba(75, 192, 192, 0.1)',
-            borderColor: '#4BC0C0',
-            borderWidth: 2,
-            pointRadius: 0, // Убираем точки для гладкости
-            pointHoverRadius: 3,
-            fill: false,
-            tension: 0.4, // Гладкость кривой
-            cubicInterpolationMode: 'monotone'
-          },
-          {
-            label: options.label2 || 'Интерполяция',
-            data: dataset2,
-            backgroundColor: 'rgba(255, 99, 132, 0.1)',
-            borderColor: '#FF6384',
-            borderWidth: 1,
+            borderColor: '#3366cc',
+            backgroundColor: 'rgba(51, 102, 204, 0.1)',
+            borderWidth: 3,
             pointRadius: 0,
-            pointHoverRadius: 2,
+            pointHoverRadius: 4,
             fill: false,
             tension: 0.4,
             cubicInterpolationMode: 'monotone',
-            borderDash: [5, 5] // Пунктирная линия для интерполяции
+            order: 1
           },
+          // Интерполяция - пунктирная линия
           {
-            label: options.label3 || 'Рабочая точка',
+            label: 'Интерполяция',
+            data: dataset2,
+            borderColor: '#dc3912',
+            backgroundColor: 'rgba(220, 57, 18, 0.1)',
+            borderWidth: 2,
+            borderDash: [8, 4],
+            pointRadius: 0,
+            pointHoverRadius: 3,
+            fill: false,
+            tension: 0.4,
+            cubicInterpolationMode: 'monotone',
+            order: 2
+          },
+          // Рабочая точка - большая точка
+          {
+            label: 'Рабочая точка',
             data: dataset3,
-            backgroundColor: '#1F6386',
-            borderColor: '#1F6386',
+            backgroundColor: '#ff9900',
+            borderColor: '#ff9900',
             borderWidth: 3,
-            pointRadius: 5,
-            pointHoverRadius: 7,
-            showLine: false, // Только точки для рабочих точек
-            pointStyle: 'circle'
-          },
-          {
-            label: options.label4 || 'Заданная точка',
-            data: dataset4,
-            backgroundColor: '#117722',
-            borderColor: '#16753b',
-            borderWidth: 3,
-            pointRadius: 5,
-            pointHoverRadius: 7,
+            pointRadius: 8,
+            pointHoverRadius: 10,
             showLine: false,
-            pointStyle: 'rect'
+            pointStyle: 'circle',
+            order: 3
+          },
+          // Заданная точка - квадрат
+          {
+            label: 'Заданная точка',
+            data: dataset4,
+            backgroundColor: '#109618',
+            borderColor: '#109618',
+            borderWidth: 3,
+            pointRadius: 8,
+            pointHoverRadius: 10,
+            showLine: false,
+            pointStyle: 'rect',
+            order: 4
           }
         ]
       },
       options: {
-        responsive: false, // Отключаем responsive для фиксированного размера
+        responsive: false,
         maintainAspectRatio: false,
-        interaction: {
-          intersect: false,
-          mode: 'index'
+        plugins: {
+          legend: {
+            display: true,
+            position: 'top',
+            align: 'center',
+            labels: {
+              boxWidth: 12,
+              padding: 15,
+              usePointStyle: true,
+              font: {
+                size: 11,
+                family: "'Helvetica Neue', 'Helvetica', 'Arial', sans-serif"
+              }
+            }
+          },
+          title: {
+            display: true,
+            text: options.title || 'Аэродинамическая характеристика',
+            position: 'top',
+            align: 'center',
+            font: {
+              size: 14,
+              weight: 'bold',
+              family: "'Helvetica Neue', 'Helvetica', 'Arial', sans-serif"
+            },
+            padding: {
+              top: 10,
+              bottom: 20
+            }
+          },
+          tooltip: {
+            mode: 'nearest',
+            intersect: false,
+            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+            titleFont: {
+              size: 12,
+              family: "'Helvetica Neue', 'Helvetica', 'Arial', sans-serif"
+            },
+            bodyFont: {
+              size: 11,
+              family: "'Helvetica Neue', 'Helvetica', 'Arial', sans-serif"
+            },
+            padding: 10,
+            cornerRadius: 4,
+            displayColors: true,
+            callbacks: {
+              label: function(context) {
+                let label = context.dataset.label || '';
+                if (label) {
+                  label += ': ';
+                }
+                if (context.parsed.y !== null) {
+                  label += context.parsed.y + ' Па';
+                }
+                if (context.parsed.x !== null) {
+                  label += ' при ' + context.parsed.x + ' м³/ч';
+                }
+                return label;
+              }
+            }
+          }
         },
         scales: {
           x: {
             type: 'linear',
+            display: true,
             title: {
               display: true,
               text: options.xLabel || 'Производительность, м³/ч',
               font: {
                 size: 12,
-                weight: 'bold'
-              }
+                weight: 'bold',
+                family: "'Helvetica Neue', 'Helvetica', 'Arial', sans-serif"
+              },
+              padding: {top: 10, bottom: 5}
             },
             grid: {
-              color: 'rgba(0,0,0,0.1)'
+              color: 'rgba(0, 0, 0, 0.1)',
+              drawBorder: true,
+              drawOnChartArea: true,
+              drawTicks: true
             },
             ticks: {
               font: {
-                size: 10
+                size: 10,
+                family: "'Helvetica Neue', 'Helvetica', 'Arial', sans-serif"
+              },
+              maxRotation: 0,
+              padding: 5,
+              callback: function(value) {
+                if (value >= 1000) {
+                  return (value / 1000).toFixed(0) + 'k';
+                }
+                return value;
               }
-            }
+            },
+            // Ключевые настройки для полного отображения!
+            min: xMin,
+            max: xMax,
+            suggestedMin: xMin,
+            suggestedMax: xMax
           },
           y: {
+            type: 'linear',
+            display: true,
             title: {
               display: true,
               text: options.yLabel || 'Давление, Па',
               font: {
                 size: 12,
-                weight: 'bold'
-              }
+                weight: 'bold',
+                family: "'Helvetica Neue', 'Helvetica', 'Arial', sans-serif"
+              },
+              padding: {top: 5, bottom: 10}
             },
             grid: {
-              color: 'rgba(0,0,0,0.1)'
+              color: 'rgba(0, 0, 0, 0.1)',
+              drawBorder: true,
+              drawOnChartArea: true,
+              drawTicks: true
             },
-            beginAtZero: false,
             ticks: {
               font: {
-                size: 10
+                size: 10,
+                family: "'Helvetica Neue', 'Helvetica', 'Arial', sans-serif"
+              },
+              padding: 5,
+              callback: function(value) {
+                if (value >= 1000) {
+                  return (value / 1000).toFixed(0) + 'k';
+                }
+                return value;
               }
-            }
+            },
+            // Ключевые настройки для полного отображения!
+            min: yMin,
+            max: yMax,
+            suggestedMin: yMin,
+            suggestedMax: yMax
           }
         },
-        plugins: {
-          title: {
-            display: true,
-            text: options.title || 'Аэродинамическая характеристика',
-            font: {
-              size: 14,
-              weight: 'bold'
-            },
-            padding: 15
+        elements: {
+          point: {
+            hoverRadius: 8,
+            hoverBorderWidth: 2
           },
-          legend: {
-            display: true,
-            position: 'top',
-            labels: {
-              usePointStyle: true,
-              padding: 15,
-              font: {
-                size: 11
-              },
-              boxWidth: 12
-            }
-          },
-          tooltip: {
-            mode: 'index',
-            intersect: false,
-            backgroundColor: 'rgba(0,0,0,0.8)',
-            titleFont: {
-              size: 11
-            },
-            bodyFont: {
-              size: 10
-            }
+          line: {
+            tension: 0.4,
+            capBezierPoints: true
           }
         },
         layout: {
           padding: {
-            top: 10,
-            right: 10,
-            bottom: 10,
-            left: 10
+            left: 15,
+            right: 15,
+            top: 15,
+            bottom: 15
           }
+        },
+        animation: {
+          duration: 0
         }
       }
     };
@@ -281,7 +385,8 @@ async function plotTwoCurvesToJPG(dataset1, dataset2, dataset3, dataset4, output
     chart.setConfig(chartConfig);
     chart.setWidth(chartWidth);
     chart.setHeight(chartHeight);
-    chart.setBackgroundColor('white');
+    chart.setBackgroundColor('#ffffff');
+    chart.setVersion('4');
 
     // Получаем URL изображения
     const imageUrl = chart.getUrl();
@@ -296,6 +401,18 @@ async function plotTwoCurvesToJPG(dataset1, dataset2, dataset3, dataset4, output
       console.log('Не удалось конвертировать изображение в base64:', error.message);
     }
 
+    console.log('График сгенерирован:', {
+      dataPoints: allDataPoints.length,
+      xRange: [xMin, xMax],
+      yRange: [yMin, yMax],
+      datasets: [
+        dataset1.length,
+        dataset2.length, 
+        dataset3.length,
+        dataset4.length
+      ]
+    });
+
     return {
       success: true,
       graph: {
@@ -305,8 +422,12 @@ async function plotTwoCurvesToJPG(dataset1, dataset2, dataset3, dataset4, output
         width: chartWidth,
         height: chartHeight,
         config: chartConfig,
+        dataRanges: {
+          x: { min: xMin, max: xMax },
+          y: { min: yMin, max: yMax }
+        },
         additionalData: {
-          pointsCount: dataset1.length + dataset2.length + dataset3.length,
+          pointsCount: allDataPoints.length,
           createdAt: new Date().toISOString()
         }
       }
@@ -323,34 +444,42 @@ async function plotTwoCurvesToJPG(dataset1, dataset2, dataset3, dataset4, output
             { 
               label: 'Характеристика вентилятора', 
               data: dataset1,
-              borderColor: '#4BC0C0',
+              borderColor: '#3366cc',
+              borderWidth: 3,
               tension: 0.4
             },
             { 
               label: 'Интерполяция', 
               data: dataset2,
-              borderColor: '#FF6384',
-              borderDash: [5, 5],
+              borderColor: '#dc3912',
+              borderWidth: 2,
+              borderDash: [8, 4],
               tension: 0.4
             },
             { 
               label: 'Рабочая точка', 
               data: dataset3,
-              backgroundColor: '#1F6386',
-              showLine: false
+              backgroundColor: '#ff9900',
+              showLine: false,
+              pointRadius: 8
             },
             { 
               label: 'Заданная точка', 
               data: dataset4,
-              backgroundColor: '#117722',
-              showLine: false
+              backgroundColor: '#109618',
+              showLine: false,
+              pointRadius: 8
             }
           ]
         },
         options: {
           title: options.title || 'Аэродинамическая характеристика',
           xLabel: options.xLabel || 'Производительность, м³/ч',
-          yLabel: options.yLabel || 'Давление, Па'
+          yLabel: options.yLabel || 'Давление, Па',
+          scales: {
+            x: { min: Math.min(...dataset1.map(p => p.x)), max: Math.max(...dataset1.map(p => p.x)) },
+            y: { min: 0, max: Math.max(...dataset1.map(p => p.y)) }
+          }
         },
         format: 'data'
       }
