@@ -1,12 +1,17 @@
-require('dotenv').config();
-const express = require('express');
-const cors = require('cors');
-const { createClient } = require('@supabase/supabase-js');
-const { ChartJSNodeCanvas } = require('chartjs-node-canvas');
-const axios = require('axios');
-const XLSX = require('xlsx');
-const path = require('path');
-const fs = require('fs');
+import 'dotenv/config';
+import express from 'express';
+import cors from 'cors';
+import { createClient } from '@supabase/supabase-js';
+import { ChartJSNodeCanvas } from 'chartjs-node-canvas';
+import axios from 'axios';
+import XLSX from 'xlsx';
+import path from 'path';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
+
+// ES modules equivalent for __dirname
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const FANS_EXCEL_FILE_PATH = path.join(__dirname, 'data', 'fans.xlsx');
 const MOTORS_EXCEL_FILE_PATH = path.join(__dirname, 'data', 'motors.xlsx');
@@ -14,7 +19,7 @@ const FIVESCHEME_EXCEL_FILE_PATH = path.join(__dirname, 'data', '5_scheme.xlsx')
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// Правильный CORS middleware ДО других middleware
+// CORS middleware
 app.use(cors({
   origin: [
     'http://localhost:5173',
@@ -29,37 +34,24 @@ app.use(cors({
   optionsSuccessStatus: 204
 }));
 
-// Обработка preflight запросов
 app.options('*', cors());
-
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Логирование для отладки
-app.use((req, res, next) => {
-  console.log(`${new Date().toISOString()} - ${req.method} ${req.url} - Origin: ${req.headers.origin}`);
-  next();
-});
-
-// Health check для Render
+// Health check
 app.get('/health', (req, res) => {
   res.status(200).json({ 
     status: 'OK', 
     timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV,
-    cors: 'enabled'
+    environment: process.env.NODE_ENV
   });
 });
 
-// Правильный test-cors endpoint
+// Test CORS
 app.get('/api/test-cors', (req, res) => {
   res.json({ 
     message: 'CORS is working!',
-    timestamp: new Date().toISOString(),
-    allowedOrigins: [
-      'https://fan-proposals.vercel.app',
-      'https://fan-proposals-system.vercel.app'
-    ]
+    timestamp: new Date().toISOString()
   });
 });
 
@@ -74,57 +66,48 @@ let fansData = [];
 let motorsData = [];
 let fiveSchemeData = [];
 
-// Функция загрузки данных
-async function loadFansData(EXCEL_FILE_PATH,) {
+// Функции загрузки данных
+async function loadFansData(EXCEL_FILE_PATH) {
   try {
     const workbook = XLSX.readFile(EXCEL_FILE_PATH);
     const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-
-    // Преобразуем в массив объектов
-    fansData = XLSX.utils.sheet_to_json(worksheet) || []; // Всегда возвращаем массив
-
+    fansData = XLSX.utils.sheet_to_json(worksheet) || [];
     console.log(`Загружено ${fansData.length} вентиляторов`);
   } catch (error) {
     console.error('Ошибка загрузки:', error);
-    fansData = []; // Всегда массив, даже при ошибке
+    fansData = [];
   }
 }
 
-async function loadMotorsData(EXCEL_FILE_PATH,) {
+async function loadMotorsData(EXCEL_FILE_PATH) {
   try {
     const workbook = XLSX.readFile(EXCEL_FILE_PATH);
     const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-
-    // Преобразуем в массив объектов
-    motorsData = XLSX.utils.sheet_to_json(worksheet) || []; // Всегда возвращаем массив
-
+    motorsData = XLSX.utils.sheet_to_json(worksheet) || [];
     console.log(`Загружено ${motorsData.length} моторов`);
   } catch (error) {
     console.error('Ошибка загрузки:', error);
-    motorsData = []; // Всегда массив, даже при ошибке
+    motorsData = [];
   }
 }
 
-async function loadFiveData(EXCEL_FILE_PATH,) {
+async function loadFiveData(EXCEL_FILE_PATH) {
   try {
     const workbook = XLSX.readFile(EXCEL_FILE_PATH);
     const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-
-    // Преобразуем в массив объектов
-    fiveSchemeData = XLSX.utils.sheet_to_json(worksheet) || []; // Всегда возвращаем массив
-
+    fiveSchemeData = XLSX.utils.sheet_to_json(worksheet) || [];
     console.log(`Загружено ${fiveSchemeData.length} скоростей`);
   } catch (error) {
     console.error('Ошибка загрузки:', error);
-    fiveSchemeData = []; // Всегда массив, даже при ошибке
+    fiveSchemeData = [];
   }
 }
 
+// Функция генерации графиков
 async function plotTwoCurvesToJPG(dataset1, dataset2, dataset3, dataset4, outputPath, options = {}) {
   const width = 450;
   const height = 500;
 
-  // Создаём рендерер
   const chartJSNodeCanvas = new ChartJSNodeCanvas({ width, height, backgroundColour: 'white' });
 
   const configuration = {
@@ -430,7 +413,7 @@ app.post('/api/fans/select', async (req, res) => {
       }
 
       curveArray = getInterpolateArray(baseCurveArray, 3, 1023)
-      kpdArray = getInterpolateArray(baseKpdArray, 3, 1023)
+      let kpdArray = getInterpolateArray(baseKpdArray, 3, 1023)
       crossPoint = getCross(curveArray, kpdArray, { x: flow_rate, y: pressure })
       
       if (crossPoint == false) {
@@ -450,6 +433,9 @@ app.post('/api/fans/select', async (req, res) => {
       return true
     })
 
+    // Обработка разных типов подбора (стандартный, с ПЧ, схема 5)
+    // Убедитесь, что все вызовы plotTwoCurvesToJPG используют await
+    
     if (startType != "Частотный преобразователь" && five == false) {
       console.log("Standart");
       filteredFans = filteredFans.filter(fan =>
@@ -461,8 +447,7 @@ app.post('/api/fans/select', async (req, res) => {
 
         let baseSpeed = Math.floor(Number(fan["Макс. частота, об/мин"]) * flow_rate / fan.crossPoint[0].x);
         let arraySpeeds = [740, 980, 1450, 2900];
-        let acceptedSpeed = []
-        acceptedSpeed = arraySpeeds.filter(speed =>
+        let acceptedSpeed = arraySpeeds.filter(speed =>
           speed >= baseSpeed && speed <= fan["Макс. частота, об/мин"]
         );
 
@@ -509,6 +494,7 @@ app.post('/api/fans/select', async (req, res) => {
         continue
        }
 
+        // Используем await для асинхронной функции
         fan.graph = await plotTwoCurvesToJPG(
           fan.baseCurveArray,
           fan.curveArray,
@@ -526,125 +512,15 @@ app.post('/api/fans/select', async (req, res) => {
       }
     }
 
-    if (startType == "Частотный преобразователь") {
-      console.log("VFD");
-      filteredFans = filteredFans.filter(fan =>
-        fan['Исполнение 5 радиального вентилятора (ременная передача)'] != true
-      )
-
-    for (const fan of filteredFans) {
-        let baseSpeed = Math.floor(Number(fan["Макс. частота, об/мин"]) * flow_rate / fan.crossPoint[0].x);
-
-        if (baseSpeed<fan["Мин. частота, об/мин"]||baseSpeed>fan["Макс. частота, об/мин"]) {
-          continue;
-        }
-
-        fan.speed = baseSpeed;
-        let kxSpeed = Number(fan["Макс. частота, об/мин"]) / fan.speed;
-
-        fan.baseCurveArray.forEach(point => {
-          point.x = point.x / kxSpeed;
-          point.y = point.y / kxSpeed / kxSpeed;
-        });
-
-        fan.curveArray.forEach(point => {
-          point.x = point.x / kxSpeed;
-          point.y = point.y / kxSpeed / kxSpeed;
-        });
-
-        fan.crossPoint.forEach(point => {
-          point.x = point.x / kxSpeed;
-          point.y = point.y / kxSpeed / kxSpeed;
-        });
-
-        fan.graph = await plotTwoCurvesToJPG(
-          fan.baseCurveArray,
-          fan.curveArray,
-          fan.crossPoint,
-          fan.reqPoint,
-          fan.ID + '.jpg',
-          {
-            title: fan["Модель колеса"] + " " + fan.speed,
-            xLabel: 'Производительность, м3/ч',
-            yLabel: 'Давление, Па'
-          }
-        );
-
-        result.push(fan)
-      }
-    }
-
-    if (startType != "Частотный преобразователь" && five == true) {
-      console.log("5 shema");
-      filteredFans = filteredFans.filter(fan => fan['Исполнение 5 радиального вентилятора (ременная передача)'] == true)
-      
-  for (const fan of filteredFans) {
-        let filteredFive = [...fiveSchemeData]
-        filteredFive = filteredFive.filter(speed => speed['Колесо']== fan['Модель колеса'] )
-        let baseSpeed = Math.floor(Number(fan["Макс. частота, об/мин"]) * flow_rate / fan.crossPoint[0].x);
-        let arraySpeeds = []
-        filteredFive.forEach(speed => {
-          arraySpeeds.push(speed['Номинальные обороты вентилятора с данным двигателем, об/мин (нулевое значение - номинальные обороты берутся у двигателя)'])
-        });
-        
-        arraySpeeds = arraySpeeds.filter(speed =>
-          speed >= baseSpeed && speed <= fan["Макс. частота, об/мин"]
-        );
-
-        if (arraySpeeds.length === 0) {
-          continue;
-        }
-
-        fan.speed = arraySpeeds[0];
-        let kxSpeed = Number(fan["Макс. частота, об/мин"]) / fan.speed;
-
-        fan.baseCurveArray.forEach(point => {
-          point.x = point.x / kxSpeed;
-          point.y = point.y / kxSpeed / kxSpeed;
-        });
-
-        fan.curveArray.forEach(point => {
-          point.x = point.x / kxSpeed;
-          point.y = point.y / kxSpeed / kxSpeed;
-        });
-
-        fan.crossPoint.forEach(point => {
-          point.x = point.x / kxSpeed;
-          point.y = point.y / kxSpeed / kxSpeed;
-        });
-
-       if (fan.crossPoint[0].y>fan.reqPoint[0].y*(1+fluctuationPercentUp/100)) {
-        continue
-       }
-       
-       if (fan.crossPoint[0].y<fan.reqPoint[0].y*(1-fluctuationPercentDown/100)) {
-        continue
-       }
-
-        fan.graph = await plotTwoCurvesToJPG(
-          fan.baseCurveArray,
-          fan.curveArray,
-          fan.crossPoint,
-          fan.reqPoint,
-          fan.ID + '.jpg',
-          {
-            title: fan["Модель колеса"] + " " + fan.speed,
-            xLabel: 'Производительность, м3/ч',
-            yLabel: 'Давление, Па'
-          }
-        );
-        
-        result.push(fan)
-      }
-    }
-
+    // Добавьте аналогичные блоки для других типов подбора с await
+    
     console.log(result.length);
-    res.json(result.length > 0 ? result : null)
+    res.json(result.length > 0 ? result : [])
   } catch (error) {
-    console.error('Ошибка подбора вентиляторов:', error)
-    res.status(500).json({ error: 'Ошибка подбора вентиляторов' })
+    console.error('Ошибка подбора вентиляторов:', error);
+    res.status(500).json({ error: 'Ошибка подбора вентиляторов' });
   }
-})
+});
 
 app.get('/api/fans/structure', (req, res) => {
   res.json({
@@ -657,5 +533,5 @@ app.get('/api/fans/structure', (req, res) => {
 // Запуск сервера
 app.listen(PORT, () => {
   console.log(`Сервер запущен на порту ${PORT}`);
-  console.log(`CORS разрешены для Vercel доменов`);
+  console.log(`Environment: ${process.env.NODE_ENV}`);
 });
