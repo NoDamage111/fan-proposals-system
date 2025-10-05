@@ -7,6 +7,7 @@ import axios from 'axios';
 import XLSX from 'xlsx';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import fetch from 'node-fetch';
 
 // ES modules equivalent for __dirname
 const __filename = fileURLToPath(import.meta.url);
@@ -102,70 +103,97 @@ async function loadFiveData(EXCEL_FILE_PATH) {
   }
 }
 
-// Новая функция генерации графиков с QuickChart
+// Улучшенная функция генерации графиков с гладкими линиями
 async function plotTwoCurvesToJPG(dataset1, dataset2, dataset3, dataset4, outputPath, options = {}) {
   try {
     const chart = new QuickChart();
     
-    // Преобразуем данные в формат для Chart.js
-    const chartData = {
+    // Создаем гладкие линии с cubic interpolation
+    const chartConfig = {
       type: 'line',
       data: {
         datasets: [
           {
-            label: options.label1 || 'Заданные точки',
+            label: options.label1 || 'Характеристика вентилятора',
             data: dataset1,
-            backgroundColor: '#4BC0C0',
+            backgroundColor: 'rgba(75, 192, 192, 0.1)',
             borderColor: '#4BC0C0',
-            borderWidth: 2,
-            pointRadius: 2,
-            showLine: true,
-            tension: 0.1
+            borderWidth: 3,
+            pointRadius: 0, // Убираем точки для гладкости
+            pointHoverRadius: 3,
+            fill: false,
+            tension: 0.4, // Гладкость кривой
+            cubicInterpolationMode: 'monotone'
           },
           {
             label: options.label2 || 'Интерполяция',
             data: dataset2,
-            backgroundColor: '#FF6384',
+            backgroundColor: 'rgba(255, 99, 132, 0.1)',
             borderColor: '#FF6384',
             borderWidth: 2,
-            pointRadius: 1,
-            showLine: true,
-            tension: 0.1
+            pointRadius: 0,
+            pointHoverRadius: 2,
+            fill: false,
+            tension: 0.4,
+            cubicInterpolationMode: 'monotone',
+            borderDash: [5, 5] // Пунктирная линия для интерполяции
           },
           {
-            label: options.label3 || 'CrossPoint',
+            label: options.label3 || 'Рабочая точка',
             data: dataset3,
             backgroundColor: '#1F6386',
             borderColor: '#1F6386',
-            borderWidth: 3,
-            pointRadius: 4,
-            showLine: false
+            borderWidth: 4,
+            pointRadius: 6,
+            pointHoverRadius: 8,
+            showLine: false, // Только точки для рабочих точек
+            pointStyle: 'circle'
           },
           {
-            label: options.label4 || 'ReqPoint',
+            label: options.label4 || 'Заданная точка',
             data: dataset4,
             backgroundColor: '#117722',
             borderColor: '#16753b',
-            borderWidth: 3,
-            pointRadius: 4,
-            showLine: false
+            borderWidth: 4,
+            pointRadius: 6,
+            pointHoverRadius: 8,
+            showLine: false,
+            pointStyle: 'rect'
           }
         ]
       },
       options: {
         responsive: true,
+        interaction: {
+          intersect: false,
+          mode: 'index'
+        },
         scales: {
           x: {
             type: 'linear',
             title: {
               display: true,
-              text: options.xLabel || 'Производительность, м³/ч'
+              text: options.xLabel || 'Производительность, м³/ч',
+              font: {
+                size: 14,
+                weight: 'bold'
+              }
+            },
+            grid: {
+              color: 'rgba(0,0,0,0.1)'
             }
           },
           y: {
             title: {
               display: true,
-              text: options.yLabel || 'Давление, Па'
+              text: options.yLabel || 'Давление, Па',
+              font: {
+                size: 14,
+                weight: 'bold'
+              }
+            },
+            grid: {
+              color: 'rgba(0,0,0,0.1)'
             },
             beginAtZero: false
           }
@@ -173,30 +201,64 @@ async function plotTwoCurvesToJPG(dataset1, dataset2, dataset3, dataset4, output
         plugins: {
           title: {
             display: true,
-            text: options.title || 'Аэродинамическая характеристика'
+            text: options.title || 'Аэродинамическая характеристика',
+            font: {
+              size: 16,
+              weight: 'bold'
+            },
+            padding: 20
           },
           legend: {
             display: true,
-            position: 'top'
+            position: 'top',
+            labels: {
+              usePointStyle: true,
+              padding: 20,
+              font: {
+                size: 12
+              }
+            }
+          },
+          tooltip: {
+            mode: 'index',
+            intersect: false,
+            backgroundColor: 'rgba(0,0,0,0.8)',
+            titleFont: {
+              size: 12
+            },
+            bodyFont: {
+              size: 11
+            }
           }
         }
       }
     };
 
-    chart.setConfig(chartData);
-    chart.setWidth(800);
-    chart.setHeight(600);
+    chart.setConfig(chartConfig);
+    chart.setWidth(1000);
+    chart.setHeight(700);
     chart.setBackgroundColor('white');
 
     // Получаем URL изображения
-    const imageUrl = await chart.getShortUrl();
+    const imageUrl = chart.getUrl();
     
+    // Конвертируем в base64 для использования в PDF/RTF
+    let base64Image = null;
+    try {
+      const response = await fetch(imageUrl);
+      const buffer = await response.arrayBuffer();
+      base64Image = `data:image/png;base64,${Buffer.from(buffer).toString('base64')}`;
+    } catch (error) {
+      console.log('Не удалось конвертировать изображение в base64:', error.message);
+    }
+
     return {
       success: true,
       graph: {
         url: imageUrl,
-        base64: null, // QuickChart не возвращает base64 напрямую
+        base64: base64Image,
         format: 'image/png',
+        config: chartConfig, // Сохраняем конфиг для возможного перестроения
         additionalData: {
           pointsCount: dataset1.length + dataset2.length + dataset3.length,
           createdAt: new Date().toISOString()
@@ -212,10 +274,31 @@ async function plotTwoCurvesToJPG(dataset1, dataset2, dataset3, dataset4, output
       graph: {
         data: {
           datasets: [
-            { label: 'Заданные точки', data: dataset1 },
-            { label: 'Интерполяция', data: dataset2 },
-            { label: 'CrossPoint', data: dataset3 },
-            { label: 'ReqPoint', data: dataset4 }
+            { 
+              label: 'Характеристика вентилятора', 
+              data: dataset1,
+              borderColor: '#4BC0C0',
+              tension: 0.4
+            },
+            { 
+              label: 'Интерполяция', 
+              data: dataset2,
+              borderColor: '#FF6384',
+              borderDash: [5, 5],
+              tension: 0.4
+            },
+            { 
+              label: 'Рабочая точка', 
+              data: dataset3,
+              backgroundColor: '#1F6386',
+              showLine: false
+            },
+            { 
+              label: 'Заданная точка', 
+              data: dataset4,
+              backgroundColor: '#117722',
+              showLine: false
+            }
           ]
         },
         options: {
@@ -223,13 +306,13 @@ async function plotTwoCurvesToJPG(dataset1, dataset2, dataset3, dataset4, output
           xLabel: options.xLabel || 'Производительность, м³/ч',
           yLabel: options.yLabel || 'Давление, Па'
         },
-        format: 'data' // указываем, что это данные для графика
+        format: 'data'
       }
     };
   }
 }
 
-// Остальные функции остаются без изменений
+// Остальные математические функции остаются без изменений
 function leastSquaresInterpolation(points, degree) {
   let X = [];
   let Y = [];
@@ -522,7 +605,7 @@ app.post('/api/fans/select', async (req, res) => {
         continue
        }
 
-        // Генерируем график
+        // Генерируем график с гладкими линиями
         fan.graph = await plotTwoCurvesToJPG(
           fan.baseCurveArray,
           fan.curveArray,
@@ -530,8 +613,8 @@ app.post('/api/fans/select', async (req, res) => {
           fan.reqPoint,
           fan.ID + '.jpg',
           {
-            title: fan["Модель колеса"] + " " + fan.speed,
-            xLabel: 'Производительность, м3/ч',
+            title: `${fan["Модель колеса"]} - ${fan.speed} об/мин`,
+            xLabel: 'Производительность, м³/ч',
             yLabel: 'Давление, Па'
           }
         );

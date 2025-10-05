@@ -631,15 +631,16 @@ const selectFan = async (fan) => {
   selectedFan.value = initializeAdditionalOptions(fan)
   await nextTick()
   
-  if (image.value && fan.graph?.graph?.url) {
-    // Если есть URL графика от QuickChart
-    image.value.src = fan.graph.graph.url;
-  } else if (image.value && fan.graph?.graph?.base64) {
-    // Если есть base64 (старый формат)
-    image.value.src = fan.graph.graph.base64;
-  } else if (fan.graph?.graph?.format === 'data') {
-    // Если это данные для графика - можно отобразить сообщение
-    console.log('График будет построен на клиенте:', fan.graph.graph.data);
+  if (image.value) {
+    if (fan.graph?.graph?.base64) {
+      // Используем base64 для лучшей совместимости
+      image.value.src = fan.graph.graph.base64;
+    } else if (fan.graph?.graph?.url) {
+      // Используем URL если base64 нет
+      image.value.src = fan.graph.graph.url;
+    } else {
+      console.log('График не доступен');
+    }
   }
 }
 

@@ -146,12 +146,14 @@
                         </v-card-title>
                         <v-card-text>
                           <div class="chart-container">
-                            <img 
-                              :src="selectedFanData.fan_data.graph.graph.base64" 
-                              alt="Аэродинамическая характеристика"
-                              style="max-width: 100%; height: auto;"
-                            />
-                          </div>
+  <img 
+    id="fan-dialog-image"
+    :src="selectedFanData?.fan_data?.graph?.graph?.base64 || selectedFanData?.fan_data?.graph?.graph?.url" 
+    alt="Аэродинамическая характеристика"
+    style="max-width: 100%; height: auto;"
+    @error="handleImageError"
+  />
+</div>
                         </v-card-text>
                       </v-card>
                     </v-list-item>
@@ -268,6 +270,14 @@ const loadProposal = async () => {
 const showFanDetails = (fan) => {
   selectedFanData.value = fan
   showFanDialog.value = true
+  
+  // Даем время на рендеринг диалога
+  nextTick(() => {
+    const dialogImage = document.querySelector('#fan-dialog-image');
+    if (dialogImage && fan.fan_data?.graph?.graph?.base64) {
+      dialogImage.src = fan.fan_data.graph.graph.base64;
+    }
+  });
 }
 
 // Функция для загрузки изображения как base64
@@ -823,12 +833,12 @@ const generatePDF = async () => {
       // Добавляем график если он есть
       if (fanData.graph?.graph?.base64) {
         documentDefinition.content.push(
-          {
-            image: fanData.graph.graph.base64,
-            width: 400,
-            alignment: 'center',
-            margin: [0, 20, 0, 10]
-          },
+     {
+      image: fanData.graph.graph.base64,
+      width: 400,
+      alignment: 'center',
+      margin: [0, 20, 0, 10]
+    }
           {
             text: `Вентилятор: ${fanData['Модель колеса']}, скорость вращения: ${fanData.speed} об/мин`,
             style: 'imageCaption',
