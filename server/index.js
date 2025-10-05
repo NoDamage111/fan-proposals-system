@@ -109,7 +109,7 @@ async function plotTwoCurvesToJPG(dataset1, dataset2, dataset3, dataset4, output
     
     // Преобразуем данные в формат для Chart.js
     const chartData = {
-      type: 'scatter',
+      type: 'line',
       data: {
         datasets: [
           {
