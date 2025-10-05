@@ -7,7 +7,6 @@ const axios = require('axios');
 const XLSX = require('xlsx');
 const path = require('path');
 const fs = require('fs');
-const { error } = require('console');
 
 const FANS_EXCEL_FILE_PATH = path.join(__dirname, 'data', 'fans.xlsx');
 const MOTORS_EXCEL_FILE_PATH = path.join(__dirname, 'data', 'motors.xlsx');
@@ -15,15 +14,7 @@ const FIVESCHEME_EXCEL_FILE_PATH = path.join(__dirname, 'data', '5_scheme.xlsx')
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// Middleware
-
-app.use((req, res, next) => {
-  console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`)
-  console.log('Origin:', req.headers.origin)
-  console.log('Headers:', req.headers)
-  next()
-})
-
+// Правильный CORS middleware ДО других middleware
 app.use(cors({
   origin: [
     'http://localhost:5173',
@@ -37,8 +28,18 @@ app.use(cors({
   preflightContinue: false,
   optionsSuccessStatus: 204
 }));
+
+// Обработка preflight запросов
+app.options('*', cors());
+
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// Логирование для отладки
+app.use((req, res, next) => {
+  console.log(`${new Date().toISOString()} - ${req.method} ${req.url} - Origin: ${req.headers.origin}`);
+  next();
+});
 
 // Health check для Render
 app.get('/health', (req, res) => {
@@ -50,7 +51,7 @@ app.get('/health', (req, res) => {
   });
 });
 
-// Тестовый endpoint для проверки CORS
+// Правильный test-cors endpoint
 app.get('/api/test-cors', (req, res) => {
   res.json({ 
     message: 'CORS is working!',
@@ -68,14 +69,10 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_KEY
 );
 
-console.log('Server started with CORS enabled for Vercel domains');
-
 // Глобальная переменная для хранения данных
 let fansData = [];
 let motorsData = [];
-let fiveSchemeData = []
-
-
+let fiveSchemeData = [];
 
 // Функция загрузки данных
 async function loadFansData(EXCEL_FILE_PATH,) {
@@ -123,10 +120,9 @@ async function loadFiveData(EXCEL_FILE_PATH,) {
   }
 }
 
-async function plotTwoCurvesToJPG(dataset1, dataset2, dataset3, dataset4, outputPath, options = {}) {
+function plotTwoCurvesToJPG(dataset1, dataset2, dataset3, dataset4, outputPath, options = {}) {
   const width = 450;
   const height = 500;
-
 
   // Создаём рендерер
   const chartJSNodeCanvas = new ChartJSNodeCanvas({ width, height, backgroundColour: 'white' });
@@ -205,17 +201,14 @@ async function plotTwoCurvesToJPG(dataset1, dataset2, dataset3, dataset4, output
   };
 
   try {
-    // const image = await chartJSNodeCanvas.renderToBuffer(configuration, 'image/jpeg');
     const imageBase64 = await chartJSNodeCanvas.renderToDataURL(configuration)
-
 
     return {
       success: true,
       graph: {
         base64: imageBase64,
-        // buffer: image, // Бинарные данные
         format: 'image/jpeg',
-        additionalData: { // Любые дополнительные данные
+        additionalData: {
           pointsCount: dataset1.length + dataset2.length + dataset3.length,
           createdAt: new Date().toISOString()
         }
@@ -228,23 +221,16 @@ async function plotTwoCurvesToJPG(dataset1, dataset2, dataset3, dataset4, output
 }
 
 function leastSquaresInterpolation(points, degree) {
-  // if (points.length < 5 || points.length > 10) {
-  //     throw new Error('Количество точек должно быть от 5 до 10' + points.length);
-  // }
-
-  // Создаем матрицу для системы уравнений
   let X = [];
   let Y = [];
   const n = points.length;
   const m = degree + 1;
 
-  // Инициализация матриц
   for (let i = 0; i < m; i++) {
     X[i] = new Array(m).fill(0);
     Y[i] = 0;
   }
 
-  // Заполнение матриц
   for (let i = 0; i < m; i++) {
     for (let j = 0; j < m; j++) {
       let sum = 0;
@@ -261,9 +247,7 @@ function leastSquaresInterpolation(points, degree) {
     Y[i] = sumY;
   }
 
-  // Решение системы уравнений (методом Гаусса)
   for (let k = 0; k < m; k++) {
-    // Поиск максимального элемента в текущем столбце
     let max = Math.abs(X[k][k]);
     let maxRow = k;
     for (let i = k + 1; i < m; i++) {
@@ -273,7 +257,6 @@ function leastSquaresInterpolation(points, degree) {
       }
     }
 
-    // Перестановка строк
     for (let i = k; i < m; i++) {
       let tmp = X[maxRow][i];
       X[maxRow][i] = X[k][i];
@@ -283,7 +266,6 @@ function leastSquaresInterpolation(points, degree) {
     Y[maxRow] = Y[k];
     Y[k] = tmp;
 
-    // Приведение к треугольному виду
     for (let i = k + 1; i < m; i++) {
       let c = -X[i][k] / X[k][k];
       for (let j = k; j < m; j++) {
@@ -297,7 +279,6 @@ function leastSquaresInterpolation(points, degree) {
     }
   }
 
-  // Обратный ход (нахождение коэффициентов)
   let coefficients = new Array(m).fill(0);
   for (let i = m - 1; i >= 0; i--) {
     coefficients[i] = Y[i] / X[i][i];
@@ -306,7 +287,6 @@ function leastSquaresInterpolation(points, degree) {
     }
   }
 
-  // Возвращаем функцию, которая вычисляет y для заданного x
   return function (x) {
     let y = 0;
     for (let i = 0; i < coefficients.length; i++) {
@@ -317,7 +297,6 @@ function leastSquaresInterpolation(points, degree) {
 }
 
 function getInterpolateArray(baseArray, degree, stepCount) {
-
   let interpolateArray = []
   let step = (baseArray[baseArray.length - 1].x - baseArray[0].x) / stepCount
 
@@ -332,10 +311,8 @@ function getInterpolateArray(baseArray, degree, stepCount) {
     tempPoint.x = x
     tempPoint.y = y
 
-
     interpolateArray.push(tempPoint)
   }
-  // console.log(interpolateArray);
 
   return interpolateArray
 }
@@ -363,15 +340,9 @@ function getArrayCurve(fan, startFirstMessage, endFirstMessage, startSecondMessa
 }
 
 function getCross(curve, kpd, point) {
-
-  //Вычисляем коэффициент системы
   let k = point.y / point.x / point.x
 
-
-  //Проверяем границы
   if (curve[0].y < curve[0].x * curve[0].x * k || curve[curve.length - 1].y > curve[curve.length - 1].x * curve[curve.length - 1].x * k) {
-
-
     console.log("ne popali");
     return false
   }
@@ -380,7 +351,6 @@ function getCross(curve, kpd, point) {
   let step = curve.length / 2
 
   for (let i = 0; i <= 10; i++) {
-
     step = Math.floor(step / 2)
     if (curve[currentIndex].y > curve[currentIndex].x * curve[currentIndex].x * k) {
       currentIndex = currentIndex + step
@@ -389,15 +359,12 @@ function getCross(curve, kpd, point) {
     }
   }
 
-
   return [{
     x: Math.floor(curve[currentIndex].x),
     y: Math.floor(curve[currentIndex].x * curve[currentIndex].x * k),
     kpd: Math.floor(kpd[currentIndex].y)
   }]
-
 }
-
 
 // Инициализация загрузки
 loadFansData(FANS_EXCEL_FILE_PATH);
@@ -407,28 +374,19 @@ loadFiveData(FIVESCHEME_EXCEL_FILE_PATH);
 // Обработчик для подбора вентиляторов
 app.post('/api/fans/select', async (req, res) => {
   try {
-
-
     let baseCurveArray = []
     let baseKpdArray = []
     let curveArray = []
     let result = []
     let crossPoint = []
     
-    // Фильтрация по параметрам (если они указаны)
     let filteredFans = [...fansData]
     let filteredMotors = [...motorsData]
-    
-
 
     const { flow_rate, pressure, system, quantity, type, series, execution, climate, position, rotation, fluctuationPercentUp, fluctuationPercentDown, powerReserve, typeOfMotor, temperature, height, minFreq, maxFreq, calcType, startType, five, notice } = req.body
 
-
     if (type) {
-      // console.log(filteredFans[0]);
-
       filteredFans = filteredFans.filter(fan => fan['Тип вентилятора'] === type)
-
     }
 
     if (series) {
@@ -452,15 +410,9 @@ app.post('/api/fans/select', async (req, res) => {
       )
     }
 
-    // Поиск подходящих вентиляторов
-
     filteredFans = filteredFans.filter(fan => {
-
       baseCurveArray = getArrayCurve(fan, 'Расход ', ', м<sup>3</sup>/ч', 'Давление ', ', Па')
-
       baseKpdArray = getArrayCurve(fan, 'КПД расход ', ', м<sup>3</sup>/ч', 'КПД значение ', ', % / Мощность в точке ', ', кВт')
-
-console.log(baseCurveArray);
 
       const density = 1.2920*(273.15/(273.15+Number(temperature)))*(1-Number(height)/10000)
 
@@ -474,16 +426,9 @@ console.log(baseCurveArray);
         baseKpdArray[i].y = Math.floor(baseKpdArray[i].y*(baseCurveArray[i].y-pressureDinamic)/baseCurveArray[i].y)
       }
 
-
-      console.log(baseCurveArray);
-      // console.log(baseKpdArray);
-      
-
       curveArray = getInterpolateArray(baseCurveArray, 3, 1023)
       kpdArray = getInterpolateArray(baseKpdArray, 3, 1023)
-      // KpdArray = getInterpolateArray(baseKpdArray,3,20)
       crossPoint = getCross(curveArray, kpdArray, { x: flow_rate, y: pressure })
-      // console.log(crossPoint);
       
       if (crossPoint == false) {
         return false
@@ -500,19 +445,15 @@ console.log(baseCurveArray);
       fan.baseKpdArray = baseKpdArray
       fan.require = req.body
       return true
-    }
-    )
+    })
 
-    //Подбор по умолчанию ( БЕЗ ПЧ и сх.5)
     if (startType != "Частотный преобразователь" && five == false) {
       console.log("Standart");
-      // console.log(filteredFans);
       filteredFans = filteredFans.filter(fan =>
         fan['Исполнение 5 радиального вентилятора (ременная передача)'] != true
       )
 
       for (const fan of filteredFans) {
-        // console.log(fan);
         let motorList = [0.06, 0.09, 0.12, 0.18, 0.25, 0.37, 0.55, 0.75, 1.1, 1.5, 2.2, 3.0, 4.0, 5.5, 7.5, 11, 15, 18.5, 22, 30, 37, 45, 55, 75, 90, 110, 132, 160, 200, 250, 315, 400];
 
         let baseSpeed = Math.floor(Number(fan["Макс. частота, об/мин"]) * flow_rate / fan.crossPoint[0].x);
@@ -557,18 +498,13 @@ console.log(baseCurveArray);
           point.power = motorList[0]
         });
         
-
        if (fan.crossPoint[0].y>fan.reqPoint[0].y*(1+fluctuationPercentUp/100)) {
-  
         continue
        }
        
        if (fan.crossPoint[0].y<fan.reqPoint[0].y*(1-fluctuationPercentDown/100)) {
-
         continue
        }
-
-        // console.log(fan['Модель колеса']);
 
         fan.graph = await plotTwoCurvesToJPG(
           fan.baseCurveArray,
@@ -585,24 +521,19 @@ console.log(baseCurveArray);
 
         result.push(fan)
       }
-
     }
-    //Подбор с ПЧ
+
     if (startType == "Частотный преобразователь") {
       console.log("VFD");
-
       filteredFans = filteredFans.filter(fan =>
         fan['Исполнение 5 радиального вентилятора (ременная передача)'] != true
       )
 
     for (const fan of filteredFans) {
-        // console.log(fan);
-
         let baseSpeed = Math.floor(Number(fan["Макс. частота, об/мин"]) * flow_rate / fan.crossPoint[0].x);
 
-
         if (baseSpeed<fan["Мин. частота, об/мин"]||baseSpeed>fan["Макс. частота, об/мин"]) {
-          continue; // Пропускаем этот вентилятор, если нет подходящих скоростей
+          continue;
         }
 
         fan.speed = baseSpeed;
@@ -623,8 +554,6 @@ console.log(baseCurveArray);
           point.y = point.y / kxSpeed / kxSpeed;
         });
 
-        console.log(fan['Модель колеса']);
-
         fan.graph = await plotTwoCurvesToJPG(
           fan.baseCurveArray,
           fan.curveArray,
@@ -641,15 +570,12 @@ console.log(baseCurveArray);
         result.push(fan)
       }
     }
-    //Подбор 5 схема
+
     if (startType != "Частотный преобразователь" && five == true) {
       console.log("5 shema");
-
       filteredFans = filteredFans.filter(fan => fan['Исполнение 5 радиального вентилятора (ременная передача)'] == true)
       
-
   for (const fan of filteredFans) {
-        // console.log(fan);
         let filteredFive = [...fiveSchemeData]
         filteredFive = filteredFive.filter(speed => speed['Колесо']== fan['Модель колеса'] )
         let baseSpeed = Math.floor(Number(fan["Макс. частота, об/мин"]) * flow_rate / fan.crossPoint[0].x);
@@ -657,20 +583,13 @@ console.log(baseCurveArray);
         filteredFive.forEach(speed => {
           arraySpeeds.push(speed['Номинальные обороты вентилятора с данным двигателем, об/мин (нулевое значение - номинальные обороты берутся у двигателя)'])
         });
-
-        // console.log(speed['Колесо']);
         
-        
-        console.log(arraySpeeds);
-
-        // let arraySpeeds = [750, 1000, 1500, 3000];
-
         arraySpeeds = arraySpeeds.filter(speed =>
           speed >= baseSpeed && speed <= fan["Макс. частота, об/мин"]
         );
 
         if (arraySpeeds.length === 0) {
-          continue; // Пропускаем этот вентилятор, если нет подходящих скоростей
+          continue;
         }
 
         fan.speed = arraySpeeds[0];
@@ -692,18 +611,12 @@ console.log(baseCurveArray);
         });
 
        if (fan.crossPoint[0].y>fan.reqPoint[0].y*(1+fluctuationPercentUp/100)) {
-        console.log('bolwe');      
         continue
        }
        
        if (fan.crossPoint[0].y<fan.reqPoint[0].y*(1-fluctuationPercentDown/100)) {
-        console.log('bolwe');      
         continue
        }
-
-
-
-        console.log(fan['Модель колеса']);
 
         fan.graph = await plotTwoCurvesToJPG(
           fan.baseCurveArray,
@@ -722,11 +635,8 @@ console.log(baseCurveArray);
       }
     }
 
-    // Возвращаем либо отфильтрованные, либо фразу
     console.log(result.length);
-    
     res.json(result.length > 0 ? result : null)
-    //  res.json(filteredFans.length > 0 ? filteredFans : null)
   } catch (error) {
     console.error('Ошибка подбора вентиляторов:', error)
     res.status(500).json({ error: 'Ошибка подбора вентиляторов' })
@@ -740,12 +650,9 @@ app.get('/api/fans/structure', (req, res) => {
     sample: fansData.length > 0 ? fansData[0] : null
   });
 });
+
 // Запуск сервера
 app.listen(PORT, () => {
   console.log(`Сервер запущен на порту ${PORT}`);
-  console.log(`CORS разрешены для: ${[
-    'http://localhost:5173',
-    'https://fan-proposals.vercel.app', 
-    'https://fan-proposals-system.vercel.app'
-  ].join(', ')}`);
+  console.log(`CORS разрешены для Vercel доменов`);
 });
