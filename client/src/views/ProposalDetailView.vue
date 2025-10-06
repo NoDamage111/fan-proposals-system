@@ -1,5 +1,4 @@
 <template>
-  <!-- Весь template остается без изменений -->
   <v-container>
     <v-card class="pa-6">
       <template v-if="proposalsStore.isLoading && !proposalsStore.currentProposal">
@@ -146,14 +145,13 @@
                         </v-card-title>
                         <v-card-text>
                           <div class="chart-container">
-  <img 
-    id="fan-dialog-image"
-    :src="selectedFanData?.fan_data?.graph?.graph?.base64 || selectedFanData?.fan_data?.graph?.graph?.url" 
-    alt="Аэродинамическая характеристика"
-    style="max-width: 600; height: auto;"
-    @error="handleImageError"
-  />
-</div>
+                            <img 
+                              id="fan-dialog-image"
+                              :src="selectedFanData.fan_data?.graph?.graph?.base64" 
+                              alt="Аэродинамическая характеристика"
+                              style="max-width: 400px; max-height: 600px;"
+                            />
+                          </div>
                         </v-card-text>
                       </v-card>
                     </v-list-item>
@@ -224,7 +222,7 @@
 </template>
 
 <script setup>
-import { onMounted, watch, ref } from 'vue'
+import { onMounted, watch, ref, nextTick } from 'vue'
 import { useProposalsStore } from '@/stores/proposals'
 import { useRoute } from 'vue-router'
 import pdfMake from 'pdfmake/build/pdfmake'
@@ -315,21 +313,6 @@ const base64ToArrayBuffer = (base64) => {
   }
 }
 
-const convertSVGtoPNG = async (svgBase64) => {
-  return new Promise((resolve) => {
-    const img = new Image();
-    img.onload = function() {
-      const canvas = document.createElement('canvas');
-      canvas.width = 400;
-      canvas.height = 600;
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(img, 0, 0, 400, 600);
-      resolve(canvas.toDataURL('image/png'));
-    };
-    img.src = svgBase64;
-  });
-};
-
 // Функция для загрузки изображения как ArrayBuffer
 const loadImageAsArrayBuffer = async (imageUrl) => {
   try {
@@ -347,8 +330,396 @@ const loadImageAsArrayBuffer = async (imageUrl) => {
   }
 }
 
+// Функция для конвертации SVG в PNG для PDF
+const convertSVGtoPNG = async (svgBase64) => {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = function() {
+      const canvas = document.createElement('canvas');
+      canvas.width = 400;
+      canvas.height = 600;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, 400, 600);
+      resolve(canvas.toDataURL('image/png'));
+    };
+    img.src = svgBase64;
+  });
+};
 
-// Функция для генерации RTF с колонтитулами и исходной кодировкой
+const generatePDF = async () => {
+  isGeneratingPDF.value = true
+  
+  try {
+    const proposal = proposalsStore.currentProposal
+    if (!proposal || !proposal.proposal_fans?.length) {
+      alert('Нет данных для генерации PDF')
+      return
+    }
+
+    // Загружаем изображения для хэдера и футера
+    const headerBase64 = await loadImageAsBase64(headerImage)
+    const footerBase64 = await loadImageAsBase64(footerImage)
+    const blueprintBase64 = await loadImageAsBase64(blueprintImage)
+
+    // Высота хэдера и футера
+    const headerHeight = 60
+    const footerHeight = 40
+
+    // Хэдер для каждой страницы
+    const header = (currentPage, pageCount) => {
+      return {
+        image: headerBase64,
+        width: 595,
+        alignment: 'center',
+        margin: [0, 10, 0, 0]
+      }
+    }
+
+    // Футер для каждой страницы
+    const footer = (currentPage, pageCount) => {
+      return {
+        stack: [
+          {
+            image: footerBase64,
+            width: 595,
+            alignment: 'center',
+            margin: [0, 10, 0, 5]
+          },
+          {
+            text: `Страница ${currentPage} из ${pageCount}`,
+            alignment: 'center',
+            fontSize: 8,
+            color: '#666666',
+            margin: [0, 0, 0, 10]
+          }
+        ]
+      }
+    }
+
+    const documentDefinition = {
+      pageSize: 'A4',
+      pageMargins: [40, headerHeight + 20, 40, footerHeight + 20],
+      header: header,
+      footer: footer,
+      styles: {
+        documentTitle: {
+          fontSize: 18,
+          bold: true,
+          margin: [0, 0, 0, 10],
+          alignment: 'center',
+          color: '#2c3e50'
+        },
+        sectionTitle: {
+          fontSize: 14,
+          bold: true,
+          margin: [0, 15, 0, 10],
+          color: '#1976d2'
+        },
+        subsectionTitle: {
+          fontSize: 12,
+          bold: true,
+          margin: [0, 10, 0, 5],
+          color: '#2c3e50'
+        },
+        normalText: {
+          fontSize: 10,
+          margin: [0, 2, 0, 2]
+        },
+        tableHeader: {
+          bold: true,
+          fontSize: 9,
+          color: 'white',
+          fillColor: '#1976d2'
+        },
+        tableCell: {
+          fontSize: 8
+        },
+        noteText: {
+          fontSize: 9,
+          italics: true,
+          color: '#666',
+          margin: [0, 5, 0, 0]
+        }
+      },
+      defaultStyle: {
+        font: 'Roboto',
+        fontSize: 10
+      },
+      content: []
+    }
+
+    // Заголовок документа
+    documentDefinition.content.push(
+      {
+        text: `ТЕХНИЧЕСКОЕ КОММЕРЧЕСКОЕ ПРЕДЛОЖЕНИЕ`,
+        style: 'documentTitle',
+        pageBreak: 'before'
+      },
+      {
+        text: `№ ${proposal.id.slice(0, 8).toUpperCase()}`,
+        style: 'subsectionTitle',
+        alignment: 'center',
+        margin: [0, 0, 0, 20]
+      },
+      {
+        text: `Название: ${proposal.title}`,
+        style: 'subsectionTitle',
+        margin: [0, 0, 0, 5]
+      },
+      {
+        text: `Описание: ${proposal.description || 'Не указано'}`,
+        style: 'normalText',
+        margin: [0, 0, 0, 15]
+      },
+      {
+        text: `Дата создания: ${new Date(proposal.created_at).toLocaleDateString('ru-RU')}`,
+        style: 'normalText',
+        margin: [0, 0, 0, 20]
+      }
+    )
+
+    // Для каждого вентилятора создаем раздел
+    for (const [index, fan] of proposal.proposal_fans.entries()) {
+      const fanData = fan.fan_data
+      const require = fanData.require || {}
+
+      // Раздел вентилятора
+      documentDefinition.content.push(
+        {
+          text: `ВЕНТИЛЯТОР ${index + 1}`,
+          style: 'sectionTitle',
+          pageBreak: index > 0 ? 'before' : undefined
+        },
+        {
+          text: `Модель: ${fanData['Модель колеса'] || 'Не указана'}`,
+          style: 'subsectionTitle',
+          margin: [0, 0, 0, 10]
+        }
+      )
+
+      // Заданные параметры
+      documentDefinition.content.push(
+        {
+          text: 'ЗАДАННЫЕ ПАРАМЕТРЫ',
+          style: 'subsectionTitle',
+          margin: [0, 10, 0, 5]
+        },
+        {
+          table: {
+            headerRows: 1,
+            widths: ['*', '*'],
+            body: [
+              [
+                { text: 'Параметр', style: 'tableHeader' },
+                { text: 'Значение', style: 'tableHeader' }
+              ],
+              [
+                { text: 'Производительность', style: 'tableCell' },
+                { text: `${require.flow_rate || 'Н/Д'} м³/ч`, style: 'tableCell' }
+              ],
+              [
+                { text: 'Давление', style: 'tableCell' },
+                { text: `${require.pressure || 'Н/Д'} Па`, style: 'tableCell' }
+              ],
+              [
+                { text: 'Тип вентилятора', style: 'tableCell' },
+                { text: require.type || 'Н/Д', style: 'tableCell' }
+              ],
+              [
+                { text: 'Исполнение', style: 'tableCell' },
+                { text: require.execution || 'Н/Д', style: 'tableCell' }
+              ],
+              [
+                { text: 'Температура', style: 'tableCell' },
+                { text: `${require.temperature || 'Н/Д'} °C`, style: 'tableCell' }
+              ],
+              [
+                { text: 'Тип двигателя', style: 'tableCell' },
+                { text: require.typeOfMotor || 'Н/Д', style: 'tableCell' }
+              ]
+            ]
+          },
+          layout: {
+            hLineWidth: function(i, node) { return 0.5; },
+            vLineWidth: function(i, node) { return 0.5; },
+            hLineColor: function(i, node) { return '#cccccc'; },
+            vLineColor: function(i, node) { return '#cccccc'; }
+          },
+          margin: [0, 0, 0, 10]
+        }
+      )
+
+      // Результаты подбора
+      documentDefinition.content.push(
+        {
+          text: 'РЕЗУЛЬТАТЫ ПОДБОРА',
+          style: 'subsectionTitle',
+          margin: [0, 10, 0, 5]
+        },
+        {
+          table: {
+            headerRows: 1,
+            widths: ['*', '*'],
+            body: [
+              [
+                { text: 'Параметр', style: 'tableHeader' },
+                { text: 'Значение', style: 'tableHeader' }
+              ],
+              [
+                { text: 'Фактическая производительность', style: 'tableCell' },
+                { text: `${fanData.crossPoint?.[0]?.x || 'Н/Д'} м³/ч`, style: 'tableCell' }
+              ],
+              [
+                { text: 'Фактическое давление', style: 'tableCell' },
+                { text: `${fanData.crossPoint?.[0]?.y || 'Н/Д'} Па`, style: 'tableCell' }
+              ],
+              [
+                { text: 'Мощность', style: 'tableCell' },
+                { text: `${fanData.crossPoint?.[0]?.power || 'Н/Д'} кВт`, style: 'tableCell' }
+              ],
+              [
+                { text: 'КПД', style: 'tableCell' },
+                { text: `${fanData.crossPoint?.[0]?.kpd || 'Н/Д'} %`, style: 'tableCell' }
+              ],
+              [
+                { text: 'Скорость вращения', style: 'tableCell' },
+                { text: `${fanData.speed || 'Н/Д'} об/мин`, style: 'tableCell' }
+              ],
+              [
+                { text: 'Количество', style: 'tableCell' },
+                { text: `${fan.quantity || 1} шт.`, style: 'tableCell' }
+              ]
+            ]
+          },
+          layout: {
+            hLineWidth: function(i, node) { return 0.5; },
+            vLineWidth: function(i, node) { return 0.5; },
+            hLineColor: function(i, node) { return '#cccccc'; },
+            vLineColor: function(i, node) { return '#cccccc'; }
+          },
+          margin: [0, 0, 0, 10]
+        }
+      )
+
+      // График аэродинамической характеристики
+      if (fanData.graph?.graph?.base64) {
+        let chartImage = fanData.graph.graph.base64;
+        
+        // Если это SVG, конвертируем в PNG
+        if (fanData.graph.graph.format === 'image/svg+xml') {
+          chartImage = await convertSVGtoPNG(fanData.graph.graph.base64);
+        }
+        
+        documentDefinition.content.push(
+          {
+            text: 'АЭРОДИНАМИЧЕСКАЯ ХАРАКТЕРИСТИКА',
+            style: 'subsectionTitle',
+            margin: [0, 10, 0, 5]
+          },
+          {
+            image: chartImage,
+            width: 350,
+            alignment: 'center',
+            margin: [0, 5, 0, 5]
+          },
+          {
+            text: `Вентилятор: ${fanData['Модель колеса']}, скорость вращения: ${fanData.speed} об/мин`,
+            style: 'noteText',
+            alignment: 'center',
+            margin: [0, 0, 0, 10]
+          }
+        )
+      }
+
+      // Примечание
+      if (require.notice) {
+        documentDefinition.content.push(
+          {
+            text: `Примечание: ${require.notice}`,
+            style: 'noteText',
+            margin: [0, 5, 0, 15]
+          }
+        )
+      }
+
+      // Чертеж (на отдельной странице)
+      documentDefinition.content.push(
+        {
+          text: 'ГАБАРИТНО-ПРИСОЕДИНИТЕЛЬНЫЕ РАЗМЕРЫ',
+          style: 'sectionTitle',
+          pageBreak: 'before'
+        }
+      )
+
+      if (blueprintBase64) {
+        documentDefinition.content.push(
+          {
+            image: blueprintBase64,
+            width: 350,
+            alignment: 'center',
+            margin: [0, 10, 0, 10]
+          },
+          {
+            text: 'Пример чертежа - окончательный чертеж будет предоставлен после подтверждения заказа',
+            style: 'noteText',
+            alignment: 'center',
+            margin: [0, 0, 0, 20]
+          }
+        )
+      }
+
+      // Технические характеристики
+      documentDefinition.content.push(
+        {
+          table: {
+            headerRows: 1,
+            widths: ['*', '*'],
+            body: [
+              [
+                { text: 'Характеристика', style: 'tableHeader' },
+                { text: 'Значение', style: 'tableHeader' }
+              ],
+              [
+                { text: 'Габаритные размеры', style: 'tableCell' },
+                { text: 'Будут указаны в рабочих чертежах', style: 'tableCell' }
+              ],
+              [
+                { text: 'Присоединительные размеры', style: 'tableCell' },
+                { text: 'Согласно технической документации', style: 'tableCell' }
+              ],
+              [
+                { text: 'Масса', style: 'tableCell' },
+                { text: fanData['Масса, кг'] ? `${fanData['Масса, кг']} кг` : 'Уточняется при заказе', style: 'tableCell' }
+              ],
+              [
+                { text: 'Способ монтажа', style: 'tableCell' },
+                { text: 'Согласно проекту', style: 'tableCell' }
+              ]
+            ]
+          },
+          layout: {
+            hLineWidth: function(i, node) { return 0.5; },
+            vLineWidth: function(i, node) { return 0.5; },
+            hLineColor: function(i, node) { return '#cccccc'; },
+            vLineColor: function(i, node) { return '#cccccc'; }
+          },
+          margin: [0, 0, 0, 20]
+        }
+      )
+    }
+
+    // Генерируем и скачиваем PDF
+    const pdfDocGenerator = pdfMake.createPdf(documentDefinition)
+    pdfDocGenerator.download(`ТКП_${proposal.title}_${new Date().toISOString().slice(0, 10)}.pdf`)
+    
+  } catch (error) {
+    console.error('Ошибка генерации PDF:', error)
+    alert('Ошибка при генерации PDF файла')
+  } finally {
+    isGeneratingPDF.value = false
+  }
+}
+
 const generateRTF = async () => {
   isGeneratingRTF.value = true
   
@@ -609,381 +980,6 @@ const generateRTF = async () => {
     isGeneratingRTF.value = false
   }
 }
-
-const generatePDF = async () => {
-  isGeneratingPDF.value = true
-  
-  try {
-    const proposal = proposalsStore.currentProposal
-    if (!proposal || !proposal.proposal_fans?.length) {
-      alert('Нет данных для генерации PDF')
-      return
-    }
-
-    // Загружаем изображения для хэдера и футера
-    const headerBase64 = await loadImageAsBase64(headerImage)
-    const footerBase64 = await loadImageAsBase64(footerImage)
-    const blueprintBase64 = await loadImageAsBase64(blueprintImage)
-
-    // Высота хэдера и футера
-    const headerHeight = 60
-    const footerHeight = 40
-
-    // Хэдер для каждой страницы
-    const header = (currentPage, pageCount) => {
-      return {
-        image: headerBase64,
-        width: 595,
-        alignment: 'center',
-        margin: [0, 10, 0, 0]
-      }
-    }
-
-    // Футер для каждой страницы
-    const footer = (currentPage, pageCount) => {
-      return {
-        stack: [
-          {
-            image: footerBase64,
-            width: 595,
-            alignment: 'center',
-            margin: [0, 10, 0, 5]
-          },
-          {
-            text: `Страница ${currentPage} из ${pageCount}`,
-            alignment: 'center',
-            fontSize: 8,
-            color: '#666666',
-            margin: [0, 0, 0, 10]
-          }
-        ]
-      }
-    }
-
-    const documentDefinition = {
-      pageSize: 'A4',
-      pageMargins: [40, headerHeight + 20, 40, footerHeight + 20],
-      header: header,
-      footer: footer,
-      styles: {
-        documentTitle: {
-          fontSize: 18,
-          bold: true,
-          margin: [0, 0, 0, 10],
-          alignment: 'center',
-          color: '#2c3e50'
-        },
-        sectionTitle: {
-          fontSize: 14,
-          bold: true,
-          margin: [0, 15, 0, 10],
-          color: '#1976d2'
-        },
-        subsectionTitle: {
-          fontSize: 12,
-          bold: true,
-          margin: [0, 10, 0, 5],
-          color: '#2c3e50'
-        },
-        normalText: {
-          fontSize: 10,
-          margin: [0, 2, 0, 2]
-        },
-        tableHeader: {
-          bold: true,
-          fontSize: 9,
-          color: 'white',
-          fillColor: '#1976d2'
-        },
-        tableCell: {
-          fontSize: 8
-        },
-        noteText: {
-          fontSize: 9,
-          italics: true,
-          color: '#666',
-          margin: [0, 5, 0, 0]
-        }
-      },
-      defaultStyle: {
-        font: 'Roboto',
-        fontSize: 10
-      },
-      content: []
-    }
-
-    // Заголовок документа
-    documentDefinition.content.push(
-      {
-        text: `ТЕХНИЧЕСКОЕ КОММЕРЧЕСКОЕ ПРЕДЛОЖЕНИЕ`,
-        style: 'documentTitle',
-        pageBreak: 'before'
-      },
-      {
-        text: `№ ${proposal.id.slice(0, 8).toUpperCase()}`,
-        style: 'subsectionTitle',
-        alignment: 'center',
-        margin: [0, 0, 0, 20]
-      },
-      {
-        text: `Название: ${proposal.title}`,
-        style: 'subsectionTitle',
-        margin: [0, 0, 0, 5]
-      },
-      {
-        text: `Описание: ${proposal.description || 'Не указано'}`,
-        style: 'normalText',
-        margin: [0, 0, 0, 15]
-      },
-      {
-        text: `Дата создания: ${new Date(proposal.created_at).toLocaleDateString('ru-RU')}`,
-        style: 'normalText',
-        margin: [0, 0, 0, 20]
-      }
-    )
-
-    // Для каждого вентилятора создаем раздел
-    proposal.proposal_fans.forEach((fan, index) => {
-      const fanData = fan.fan_data
-      const require = fanData.require || {}
-
-      // Раздел вентилятора
-      documentDefinition.content.push(
-        {
-          text: `ВЕНТИЛЯТОР ${index + 1}`,
-          style: 'sectionTitle',
-          pageBreak: index > 0 ? 'before' : undefined
-        },
-        {
-          text: `Модель: ${fanData['Модель колеса'] || 'Не указана'}`,
-          style: 'subsectionTitle',
-          margin: [0, 0, 0, 10]
-        }
-      )
-
-      // Заданные параметры
-      documentDefinition.content.push(
-        {
-          text: 'ЗАДАННЫЕ ПАРАМЕТРЫ',
-          style: 'subsectionTitle',
-          margin: [0, 10, 0, 5]
-        },
-        {
-          table: {
-            headerRows: 1,
-            widths: ['*', '*'],
-            body: [
-              [
-                { text: 'Параметр', style: 'tableHeader' },
-                { text: 'Значение', style: 'tableHeader' }
-              ],
-              [
-                { text: 'Производительность', style: 'tableCell' },
-                { text: `${require.flow_rate || 'Н/Д'} м³/ч`, style: 'tableCell' }
-              ],
-              [
-                { text: 'Давление', style: 'tableCell' },
-                { text: `${require.pressure || 'Н/Д'} Па`, style: 'tableCell' }
-              ],
-              [
-                { text: 'Тип вентилятора', style: 'tableCell' },
-                { text: require.type || 'Н/Д', style: 'tableCell' }
-              ],
-              [
-                { text: 'Исполнение', style: 'tableCell' },
-                { text: require.execution || 'Н/Д', style: 'tableCell' }
-              ],
-              [
-                { text: 'Температура', style: 'tableCell' },
-                { text: `${require.temperature || 'Н/Д'} °C`, style: 'tableCell' }
-              ],
-              [
-                { text: 'Тип двигателя', style: 'tableCell' },
-                { text: require.typeOfMotor || 'Н/Д', style: 'tableCell' }
-              ]
-            ]
-          },
-          layout: {
-            hLineWidth: function(i, node) { return 0.5; },
-            vLineWidth: function(i, node) { return 0.5; },
-            hLineColor: function(i, node) { return '#cccccc'; },
-            vLineColor: function(i, node) { return '#cccccc'; }
-          },
-          margin: [0, 0, 0, 10]
-        }
-      )
-
-      // Результаты подбора
-      documentDefinition.content.push(
-        {
-          text: 'РЕЗУЛЬТАТЫ ПОДБОРА',
-          style: 'subsectionTitle',
-          margin: [0, 10, 0, 5]
-        },
-        {
-          table: {
-            headerRows: 1,
-            widths: ['*', '*'],
-            body: [
-              [
-                { text: 'Параметр', style: 'tableHeader' },
-                { text: 'Значение', style: 'tableHeader' }
-              ],
-              [
-                { text: 'Фактическая производительность', style: 'tableCell' },
-                { text: `${fanData.crossPoint?.[0]?.x || 'Н/Д'} м³/ч`, style: 'tableCell' }
-              ],
-              [
-                { text: 'Фактическое давление', style: 'tableCell' },
-                { text: `${fanData.crossPoint?.[0]?.y || 'Н/Д'} Па`, style: 'tableCell' }
-              ],
-              [
-                { text: 'Мощность', style: 'tableCell' },
-                { text: `${fanData.crossPoint?.[0]?.power || 'Н/Д'} кВт`, style: 'tableCell' }
-              ],
-              [
-                { text: 'КПД', style: 'tableCell' },
-                { text: `${fanData.crossPoint?.[0]?.kpd || 'Н/Д'} %`, style: 'tableCell' }
-              ],
-              [
-                { text: 'Скорость вращения', style: 'tableCell' },
-                { text: `${fanData.speed || 'Н/Д'} об/мин`, style: 'tableCell' }
-              ],
-              [
-                { text: 'Количество', style: 'tableCell' },
-                { text: `${fan.quantity || 1} шт.`, style: 'tableCell' }
-              ]
-            ]
-          },
-          layout: {
-            hLineWidth: function(i, node) { return 0.5; },
-            vLineWidth: function(i, node) { return 0.5; },
-            hLineColor: function(i, node) { return '#cccccc'; },
-            vLineColor: function(i, node) { return '#cccccc'; }
-          },
-          margin: [0, 0, 0, 10]
-        }
-      )
-
-      // График аэродинамической характеристики
-      if (fanData.graph?.graph?.base64) {
-        documentDefinition.content.push(
-          {
-            text: 'АЭРОДИНАМИЧЕСКАЯ ХАРАКТЕРИСТИКА',
-            style: 'subsectionTitle',
-            margin: [0, 10, 0, 5]
-          },
-          {
-            image: fanData.graph.graph.base64,
-            width: 350,
-            alignment: 'center',
-            margin: [0, 5, 0, 5]
-          },
-          {
-            text: `Вентилятор: ${fanData['Модель колеса']}, скорость вращения: ${fanData.speed} об/мин`,
-            style: 'noteText',
-            alignment: 'center',
-            margin: [0, 0, 0, 10]
-          }
-        )
-      }
-
-      // Примечание
-      if (require.notice) {
-        documentDefinition.content.push(
-          {
-            text: `Примечание: ${require.notice}`,
-            style: 'noteText',
-            margin: [0, 5, 0, 15]
-          }
-        )
-      }
-
-      // Чертеж (на отдельной странице)
-      documentDefinition.content.push(
-        {
-          text: 'ГАБАРИТНО-ПРИСОЕДИНИТЕЛЬНЫЕ РАЗМЕРЫ',
-          style: 'sectionTitle',
-          pageBreak: 'before'
-        }
-      )
-
-      if (blueprintBase64) {
-        documentDefinition.content.push(
-          {
-            image: blueprintBase64,
-            width: 350,
-            alignment: 'center',
-            margin: [0, 10, 0, 10]
-          },
-          {
-            text: 'Пример чертежа - окончательный чертеж будет предоставлен после подтверждения заказа',
-            style: 'noteText',
-            alignment: 'center',
-            margin: [0, 0, 0, 20]
-          }
-        )
-      }
-
-      // Технические характеристики
-      documentDefinition.content.push(
-        {
-          table: {
-            headerRows: 1,
-            widths: ['*', '*'],
-            body: [
-              [
-                { text: 'Характеристика', style: 'tableHeader' },
-                { text: 'Значение', style: 'tableHeader' }
-              ],
-              [
-                { text: 'Габаритные размеры', style: 'tableCell' },
-                { text: 'Будут указаны в рабочих чертежах', style: 'tableCell' }
-              ],
-              [
-                { text: 'Присоединительные размеры', style: 'tableCell' },
-                { text: 'Согласно технической документации', style: 'tableCell' }
-              ],
-              [
-                { text: 'Масса', style: 'tableCell' },
-                { text: fanData['Масса, кг'] ? `${fanData['Масса, кг']} кг` : 'Уточняется при заказе', style: 'tableCell' }
-              ],
-              [
-                { text: 'Способ монтажа', style: 'tableCell' },
-                { text: 'Согласно проекту', style: 'tableCell' }
-              ]
-            ]
-          },
-          layout: {
-            hLineWidth: function(i, node) { return 0.5; },
-            vLineWidth: function(i, node) { return 0.5; },
-            hLineColor: function(i, node) { return '#cccccc'; },
-            vLineColor: function(i, node) { return '#cccccc'; }
-          },
-          margin: [0, 0, 0, 20]
-        }
-      )
-    })
-
-    // Генерируем и скачиваем PDF
-    const pdfDocGenerator = pdfMake.createPdf(documentDefinition)
-    pdfDocGenerator.download(`ТКП_${proposal.title}_${new Date().toISOString().slice(0, 10)}.pdf`)
-    
-  } catch (error) {
-    console.error('Ошибка генерации PDF:', error)
-    alert('Ошибка при генерации PDF файла')
-  } finally {
-    isGeneratingPDF.value = false
-  }
-}
-
-const calculateTotal = () => {
-  if (!proposalsStore.currentProposal?.proposal_fans) return 0
-  
-  return proposalsStore.currentProposal.proposal_fans.reduce((total, fan) => {
-    return total + (fan.fan_data.price * fan.quantity)
-  }, 0)
-}
 </script>
 
 <style scoped>
@@ -1018,14 +1014,5 @@ const calculateTotal = () => {
   background-color: #f5f5f5;
   border-radius: 4px;
   padding: 16px;
-  width: 400px;
-  height: 600px;
-  margin: 0 auto;
-}
-
-.chart-container img {
-  max-width: 100%;
-  max-height: 100%;
-  object-fit: contain;
 }
 </style>

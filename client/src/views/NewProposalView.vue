@@ -25,12 +25,12 @@
           <!-- Трехколоночный интерфейс подбора -->
           <v-row>
             <!-- Колонка 1: Параметры подбора -->
-            <v-col cols="4" >
+            <v-col cols="4">
               <v-card variant="outlined">
                 <v-card-title class="text-h6">Параметры подбора</v-card-title>
                 <v-card-text>
-                  <v-row no-gutters >
-                    <v-col cols="6"  >
+                  <v-row no-gutters>
+                    <v-col cols="6">
                       <v-text-field  
                         v-model="searchParams.system"
                         label="Система"
@@ -205,7 +205,7 @@
                       <v-checkbox 
                         v-model="searchParams.five"
                         label="Исполнение 5"
-                      ></v-checkbox >
+                      ></v-checkbox>
                     </v-col>
                   </v-row>
 
@@ -275,10 +275,10 @@
                     <v-list>
                       <v-list-item>
                         <v-list-item-title class="text-h6">
-                          {{ selectedFan["Модель колеса"]  }}
+                          {{ selectedFan["Модель колеса"] }}
                         </v-list-item-title>
                         <v-list-item-subtitle>
-                          {{ selectedFan["Модель колеса"] }}
+                          {{ selectedFan["Тип вентилятора"] }}
                         </v-list-item-subtitle>
                       </v-list-item>
                       
@@ -330,8 +330,7 @@
                           </v-card-title>
                           <v-card-text>
                             <div class="chart-placeholder">
-                              <div>График рабочей точки</div>
-                              <img ref="image" >
+                              <img ref="image" style="max-width: 400px; max-height: 600px;">
                             </div>
                           </v-card-text>
                         </v-card>
@@ -570,12 +569,7 @@ const searchFans = async () => {
   hasSearched.value = true
 
   try {
-    // Используем относительный путь для продакшена
-    const apiUrl = import.meta.env.VITE_API_URL 
-      ? `${import.meta.env.VITE_API_URL}/api/fans/select`
-      : '/api/fans/select'
-
-    const response = await fetch(apiUrl, {
+    const response = await fetch('http://localhost:3001/api/fans/select', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -595,7 +589,7 @@ const searchFans = async () => {
         fluctuationPercentDown: searchParams.value.fluctuationPercentDown,
         powerReserve: searchParams.value.powerReserve,
         typeOfMotor: searchParams.value.typeOfMotor,
-        temperature: searchParams.value.temperature,
+        temperature:searchParams.value.temperature,
         height: searchParams.value.height,
         minFreq: searchParams.value.minFreq,
         maxFreq: searchParams.value.maxFreq,
@@ -606,17 +600,14 @@ const searchFans = async () => {
       })
     })
     
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`)
-    }
-    
     const data = await response.json()
     
     // Инициализируем дополнительные опции для каждого вентилятора
     searchResults.value = data.map(fan => initializeAdditionalOptions(fan))
     
+    
     if (data.length > 0) {
-      // selectedFan.value = data[0]
+      selectFan(data[0])
     }
   } catch (error) {
     console.error('Ошибка поиска:', error)
@@ -626,13 +617,10 @@ const searchFans = async () => {
   }
 }
 
-// В функции selectFan обновите отображение графика
 const selectFan = async (fan) => {
   selectedFan.value = initializeAdditionalOptions(fan)
   await nextTick()
-  
   if (image.value && fan.graph?.graph?.base64) {
-    // SVG отображается напрямую через base64
     image.value.src = fan.graph.graph.base64;
     image.value.style.maxWidth = '400px';
     image.value.style.maxHeight = '600px';
@@ -691,18 +679,10 @@ const handleSubmit = async () => {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  width: 400px;
-  height: 600px;
   background-color: #f5f5f5;
   border-radius: 4px;
   color: #666;
-  margin: 0 auto;
-}
-
-.chart-placeholder img {
-  max-width: 100%;
-  max-height: 100%;
-  object-fit: contain;
+  padding: 10px;
 }
 
 .additional-options {

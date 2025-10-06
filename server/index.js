@@ -2,12 +2,9 @@ import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import { createClient } from '@supabase/supabase-js';
-import QuickChart from 'quickchart-js';
-import axios from 'axios';
 import XLSX from 'xlsx';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import fetch from 'node-fetch';
 
 // ES modules equivalent for __dirname
 const __filename = fileURLToPath(import.meta.url);
@@ -21,39 +18,19 @@ const PORT = process.env.PORT || 3001;
 
 // CORS middleware
 app.use(cors({
-  origin: function (origin, callback) {
-    // Разрешаем запросы без origin (например, из мобильных приложений)
-    if (!origin) return callback(null, true);
-    
-    // Разрешаем локальную разработку
-    if (origin === 'http://localhost:5173') {
-      return callback(null, true);
-    }
-    
-    // Разрешаем все домены Vercel
-    if (
-      origin.endsWith('.vercel.app') ||
-      origin.endsWith('.now.sh') ||
-      origin.includes('fan-proposals-system') ||
-      origin.includes('fan-proposals-')
-    ) {
-      return callback(null, true);
-    }
-    
-    // Можно также разрешить все origins для разработки
-    // return callback(null, true);
-    
-    // Или отклонять другие домены
-    callback(new Error('Not allowed by CORS'));
-  },
+  origin: [
+    'http://localhost:5173',
+    'https://fan-proposals.vercel.app',
+    'https://fan-proposals-system.vercel.app',
+    'https://*.vercel.app'
+  ],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'X-Requested-With'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
   credentials: true,
   preflightContinue: false,
   optionsSuccessStatus: 204
 }));
 
-// Явно обрабатываем OPTIONS запросы для всех routes
 app.options('*', cors());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
@@ -127,7 +104,7 @@ async function loadFiveData(EXCEL_FILE_PATH) {
 function createSVGGraph(dataset1, dataset2, dataset3, dataset4, options = {}) {
   const width = 400;
   const height = 600;
-  const padding = 60; // Отступы для осей и легенды
+  const padding = 60;
   
   // Вычисляем границы данных
   const allDataPoints = [...dataset1, ...dataset2, ...dataset3, ...dataset4];
@@ -304,7 +281,7 @@ function formatTickValue(value) {
   return Math.round(value).toString();
 }
 
-// Обновленная функция построения графиков
+// Функция построения графиков
 async function plotTwoCurvesToJPG(dataset1, dataset2, dataset3, dataset4, outputPath, options = {}) {
   try {
     console.log('Создание SVG графика:', {
@@ -361,371 +338,6 @@ async function plotTwoCurvesToJPG(dataset1, dataset2, dataset3, dataset4, output
   }
 }
 
-// Улучшенная функция генерации графиков с правильным размером
-// Исправленная функция генерации графиков с полным отображением
-async function plotTwoCurvesToJPG(dataset1, dataset2, dataset3, dataset4, outputPath, options = {}) {
-  try {
-    const chart = new QuickChart();
-    
-    // Правильный размер 400x600 px
-    const chartWidth = 450;
-    const chartHeight = 500;
-    
-    // Вычисляем границы данных для правильного масштабирования
-    const allDataPoints = [...dataset1, ...dataset2, ...dataset3, ...dataset4];
-    const xValues = allDataPoints.map(point => point.x).filter(x => x != null);
-    const yValues = allDataPoints.map(point => point.y).filter(y => y != null);
-    
-    const minX = Math.min(...xValues);
-    const maxX = Math.max(...xValues);
-    const minY = Math.min(...yValues);
-    const maxY = Math.max(...yValues);
-    
-    // Добавляем отступы для лучшего отображения
-    const xPadding = (maxX - minX) * 0.1;
-    const yPadding = (maxY - minY) * 0.1;
-    
-    const xMin = Math.max(0, minX - xPadding); // Не ниже 0 для расхода
-    const xMax = maxX + xPadding;
-    const yMin = Math.max(0, minY - yPadding); // Не ниже 0 для давления
-    const yMax = maxY + yPadding;
-
-    // Полная конфигурация графика
-    const chartConfig = {
-      type: 'line',
-      data: {
-        datasets: [
-          // Основная характеристика вентилятора - сплошная линия
-          {
-            label: 'Характеристика вентилятора',
-            data: dataset1,
-            borderColor: '#3366cc',
-            backgroundColor: 'rgba(51, 102, 204, 0.1)',
-            borderWidth: 3,
-            pointRadius: 0,
-            pointHoverRadius: 4,
-            fill: false,
-            tension: 0.4,
-            cubicInterpolationMode: 'monotone',
-            order: 1
-          },
-          // Интерполяция - пунктирная линия
-          {
-            label: 'Интерполяция',
-            data: dataset2,
-            borderColor: '#dc3912',
-            backgroundColor: 'rgba(220, 57, 18, 0.1)',
-            borderWidth: 2,
-            borderDash: [8, 4],
-            pointRadius: 0,
-            pointHoverRadius: 3,
-            fill: false,
-            tension: 0.4,
-            cubicInterpolationMode: 'monotone',
-            order: 2
-          },
-          // Рабочая точка - большая точка
-          {
-            label: 'Рабочая точка',
-            data: dataset3,
-            backgroundColor: '#ff9900',
-            borderColor: '#ff9900',
-            borderWidth: 3,
-            pointRadius: 8,
-            pointHoverRadius: 10,
-            showLine: false,
-            pointStyle: 'circle',
-            order: 3
-          },
-          // Заданная точка - квадрат
-          {
-            label: 'Заданная точка',
-            data: dataset4,
-            backgroundColor: '#109618',
-            borderColor: '#109618',
-            borderWidth: 3,
-            pointRadius: 8,
-            pointHoverRadius: 10,
-            showLine: false,
-            pointStyle: 'rect',
-            order: 4
-          }
-        ]
-      },
-      options: {
-        responsive: false,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: {
-            display: true,
-            position: 'top',
-            align: 'center',
-            labels: {
-              boxWidth: 12,
-              padding: 15,
-              usePointStyle: true,
-              font: {
-                size: 11,
-                family: "'Helvetica Neue', 'Helvetica', 'Arial', sans-serif"
-              }
-            }
-          },
-          title: {
-            display: true,
-            text: options.title || 'Аэродинамическая характеристика',
-            position: 'top',
-            align: 'center',
-            font: {
-              size: 14,
-              weight: 'bold',
-              family: "'Helvetica Neue', 'Helvetica', 'Arial', sans-serif"
-            },
-            padding: {
-              top: 10,
-              bottom: 20
-            }
-          },
-          tooltip: {
-            mode: 'nearest',
-            intersect: false,
-            backgroundColor: 'rgba(0, 0, 0, 0.8)',
-            titleFont: {
-              size: 12,
-              family: "'Helvetica Neue', 'Helvetica', 'Arial', sans-serif"
-            },
-            bodyFont: {
-              size: 11,
-              family: "'Helvetica Neue', 'Helvetica', 'Arial', sans-serif"
-            },
-            padding: 10,
-            cornerRadius: 4,
-            displayColors: true,
-            callbacks: {
-              label: function(context) {
-                let label = context.dataset.label || '';
-                if (label) {
-                  label += ': ';
-                }
-                if (context.parsed.y !== null) {
-                  label += context.parsed.y + ' Па';
-                }
-                if (context.parsed.x !== null) {
-                  label += ' при ' + context.parsed.x + ' м³/ч';
-                }
-                return label;
-              }
-            }
-          }
-        },
-        scales: {
-          x: {
-            type: 'linear',
-            display: true,
-            title: {
-              display: true,
-              text: options.xLabel || 'Производительность, м³/ч',
-              font: {
-                size: 12,
-                weight: 'bold',
-                family: "'Helvetica Neue', 'Helvetica', 'Arial', sans-serif"
-              },
-              padding: {top: 10, bottom: 5}
-            },
-            grid: {
-              color: 'rgba(0, 0, 0, 0.1)',
-              drawBorder: true,
-              drawOnChartArea: true,
-              drawTicks: true
-            },
-            ticks: {
-              font: {
-                size: 10,
-                family: "'Helvetica Neue', 'Helvetica', 'Arial', sans-serif"
-              },
-              maxRotation: 0,
-              padding: 5,
-              callback: function(value) {
-                if (value >= 1000) {
-                  return (value / 1000).toFixed(0) + 'k';
-                }
-                return value;
-              }
-            },
-            // Ключевые настройки для полного отображения!
-            min: xMin,
-            max: xMax,
-            suggestedMin: xMin,
-            suggestedMax: xMax
-          },
-          y: {
-            type: 'linear',
-            display: true,
-            title: {
-              display: true,
-              text: options.yLabel || 'Давление, Па',
-              font: {
-                size: 12,
-                weight: 'bold',
-                family: "'Helvetica Neue', 'Helvetica', 'Arial', sans-serif"
-              },
-              padding: {top: 5, bottom: 10}
-            },
-            grid: {
-              color: 'rgba(0, 0, 0, 0.1)',
-              drawBorder: true,
-              drawOnChartArea: true,
-              drawTicks: true
-            },
-            ticks: {
-              font: {
-                size: 10,
-                family: "'Helvetica Neue', 'Helvetica', 'Arial', sans-serif"
-              },
-              padding: 5,
-              callback: function(value) {
-                if (value >= 1000) {
-                  return (value / 1000).toFixed(0) + 'k';
-                }
-                return value;
-              }
-            },
-            // Ключевые настройки для полного отображения!
-            min: yMin,
-            max: yMax,
-            suggestedMin: yMin,
-            suggestedMax: yMax
-          }
-        },
-        elements: {
-          point: {
-            hoverRadius: 8,
-            hoverBorderWidth: 2
-          },
-          line: {
-            tension: 0.4,
-            capBezierPoints: true
-          }
-        },
-        layout: {
-          padding: {
-            left: 15,
-            right: 15,
-            top: 15,
-            bottom: 15
-          }
-        },
-        animation: {
-          duration: 0
-        }
-      }
-    };
-
-    chart.setConfig(chartConfig);
-    chart.setWidth(chartWidth);
-    chart.setHeight(chartHeight);
-    chart.setBackgroundColor('#ffffff');
-    chart.setVersion('4');
-
-    // Получаем URL изображения
-    const imageUrl = chart.getUrl();
-    
-    // Конвертируем в base64 для использования в PDF/RTF
-    let base64Image = null;
-    try {
-      const response = await fetch(imageUrl);
-      const buffer = await response.arrayBuffer();
-      base64Image = `data:image/png;base64,${Buffer.from(buffer).toString('base64')}`;
-    } catch (error) {
-      console.log('Не удалось конвертировать изображение в base64:', error.message);
-    }
-
-    console.log('График сгенерирован:', {
-      dataPoints: allDataPoints.length,
-      xRange: [xMin, xMax],
-      yRange: [yMin, yMax],
-      datasets: [
-        dataset1.length,
-        dataset2.length, 
-        dataset3.length,
-        dataset4.length
-      ]
-    });
-
-    return {
-      success: true,
-      graph: {
-        url: imageUrl,
-        base64: base64Image,
-        format: 'image/png',
-        width: chartWidth,
-        height: chartHeight,
-        config: chartConfig,
-        dataRanges: {
-          x: { min: xMin, max: xMax },
-          y: { min: yMin, max: yMax }
-        },
-        additionalData: {
-          pointsCount: allDataPoints.length,
-          createdAt: new Date().toISOString()
-        }
-      }
-    };
-  } catch (error) {
-    console.error('Ошибка генерации графика:', error);
-    
-    // Fallback - возвращаем данные для построения графика на клиенте
-    return {
-      success: true,
-      graph: {
-        data: {
-          datasets: [
-            { 
-              label: 'Характеристика вентилятора', 
-              data: dataset1,
-              borderColor: '#3366cc',
-              borderWidth: 3,
-              tension: 0.4
-            },
-            { 
-              label: 'Интерполяция', 
-              data: dataset2,
-              borderColor: '#dc3912',
-              borderWidth: 2,
-              borderDash: [8, 4],
-              tension: 0.4
-            },
-            { 
-              label: 'Рабочая точка', 
-              data: dataset3,
-              backgroundColor: '#ff9900',
-              showLine: false,
-              pointRadius: 8
-            },
-            { 
-              label: 'Заданная точка', 
-              data: dataset4,
-              backgroundColor: '#109618',
-              showLine: false,
-              pointRadius: 8
-            }
-          ]
-        },
-        options: {
-          title: options.title || 'Аэродинамическая характеристика',
-          xLabel: options.xLabel || 'Производительность, м³/ч',
-          yLabel: options.yLabel || 'Давление, Па',
-          scales: {
-            x: { min: Math.min(...dataset1.map(p => p.x)), max: Math.max(...dataset1.map(p => p.x)) },
-            y: { min: 0, max: Math.max(...dataset1.map(p => p.y)) }
-          }
-        },
-        format: 'data'
-      }
-    };
-  }
-}
-
-// Остальные математические функции остаются без изменений
 function leastSquaresInterpolation(points, degree) {
   let X = [];
   let Y = [];
@@ -924,6 +536,12 @@ app.post('/api/fans/select', async (req, res) => {
       baseCurveArray = getArrayCurve(fan, 'Расход ', ', м<sup>3</sup>/ч', 'Давление ', ', Па')
       baseKpdArray = getArrayCurve(fan, 'КПД расход ', ', м<sup>3</sup>/ч', 'КПД значение ', ', % / Мощность в точке ', ', кВт')
 
+      console.log(`Вентилятор ${fan['Модель колеса']}:`, {
+        curvePoints: baseCurveArray.length,
+        firstPoint: baseCurveArray[0],
+        lastPoint: baseCurveArray[baseCurveArray.length - 1]
+      });
+
       const density = 1.2920*(273.15/(273.15+Number(temperature)))*(1-Number(height)/10000)
 
       baseCurveArray.forEach(point => {
@@ -1018,7 +636,7 @@ app.post('/api/fans/select', async (req, res) => {
         continue
        }
 
-        // Генерируем график с гладкими линиями
+        // Генерируем график
         fan.graph = await plotTwoCurvesToJPG(
           fan.baseCurveArray,
           fan.curveArray,
