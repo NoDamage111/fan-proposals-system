@@ -22,6 +22,7 @@ app.use(cors({
     'http://localhost:5173',
     'https://fan-proposals.vercel.app',
     'https://fan-proposals-system.vercel.app',
+    'https://fan-proposals-system-a94dvkewr-nodamage111s-projects.vercel.app',
     'https://*.vercel.app'
   ],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
