@@ -103,9 +103,9 @@ async function loadFiveData(EXCEL_FILE_PATH) {
 
 // Функция для создания SVG графика
 function createSVGGraph(dataset1, dataset2, dataset3, dataset4, options = {}) {
-  const width = 400;
+  const width = 600;
   const height = 600;
-  const padding = 60;
+  const padding = 20;
   
   // Вычисляем границы данных
   const allDataPoints = [...dataset1, ...dataset2, ...dataset3, ...dataset4];
