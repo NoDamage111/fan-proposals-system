@@ -631,16 +631,11 @@ const selectFan = async (fan) => {
   selectedFan.value = initializeAdditionalOptions(fan)
   await nextTick()
   
-  if (image.value) {
-    if (fan.graph?.graph?.base64) {
-      // Используем base64 для лучшей совместимости
-      image.value.src = fan.graph.graph.base64;
-    } else if (fan.graph?.graph?.url) {
-      // Используем URL если base64 нет
-      image.value.src = fan.graph.graph.url;
-    } else {
-      console.log('График не доступен');
-    }
+  if (image.value && fan.graph?.graph?.base64) {
+    // SVG отображается напрямую через base64
+    image.value.src = fan.graph.graph.base64;
+    image.value.style.maxWidth = '400px';
+    image.value.style.maxHeight = '600px';
   }
 }
 

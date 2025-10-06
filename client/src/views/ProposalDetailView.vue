@@ -271,11 +271,12 @@ const showFanDetails = (fan) => {
   selectedFanData.value = fan
   showFanDialog.value = true
   
-  // Даем время на рендеринг диалога
   nextTick(() => {
     const dialogImage = document.querySelector('#fan-dialog-image');
     if (dialogImage && fan.fan_data?.graph?.graph?.base64) {
       dialogImage.src = fan.fan_data.graph.graph.base64;
+      dialogImage.style.maxWidth = '400px';
+      dialogImage.style.maxHeight = '600px';
     }
   });
 }
@@ -313,6 +314,21 @@ const base64ToArrayBuffer = (base64) => {
     return null
   }
 }
+
+const convertSVGtoPNG = async (svgBase64) => {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = function() {
+      const canvas = document.createElement('canvas');
+      canvas.width = 400;
+      canvas.height = 600;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, 400, 600);
+      resolve(canvas.toDataURL('image/png'));
+    };
+    img.src = svgBase64;
+  });
+};
 
 // Функция для загрузки изображения как ArrayBuffer
 const loadImageAsArrayBuffer = async (imageUrl) => {

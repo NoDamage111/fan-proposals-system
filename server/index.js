@@ -123,6 +123,244 @@ async function loadFiveData(EXCEL_FILE_PATH) {
   }
 }
 
+// Функция для создания SVG графика
+function createSVGGraph(dataset1, dataset2, dataset3, dataset4, options = {}) {
+  const width = 400;
+  const height = 600;
+  const padding = 60; // Отступы для осей и легенды
+  
+  // Вычисляем границы данных
+  const allDataPoints = [...dataset1, ...dataset2, ...dataset3, ...dataset4];
+  const xValues = allDataPoints.map(point => point.x).filter(x => x != null && !isNaN(x));
+  const yValues = allDataPoints.map(point => point.y).filter(y => y != null && !isNaN(y));
+  
+  if (xValues.length === 0 || yValues.length === 0) {
+    return null;
+  }
+  
+  const minX = Math.min(...xValues);
+  const maxX = Math.max(...xValues);
+  const minY = Math.min(...yValues);
+  const maxY = Math.max(...yValues);
+  
+  // Добавляем отступы
+  const xRange = maxX - minX;
+  const yRange = maxY - minY;
+  const xMin = Math.max(0, minX - xRange * 0.05);
+  const xMax = maxX + xRange * 0.05;
+  const yMin = Math.max(0, minY - yRange * 0.05);
+  const yMax = maxY + yRange * 0.05;
+  
+  // Функции для преобразования координат
+  const scaleX = (x) => padding + (x - xMin) / (xMax - xMin) * (width - 2 * padding);
+  const scaleY = (y) => height - padding - (y - yMin) / (yMax - yMin) * (height - 2 * padding);
+  
+  // Создаем SVG
+  let svg = `<?xml version="1.0" encoding="UTF-8"?>
+<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
+  <!-- Фон -->
+  <rect width="100%" height="100%" fill="white"/>
+  
+  <!-- Сетка -->
+  <g stroke="#f0f0f0" stroke-width="1">
+    <!-- Вертикальные линии -->
+    <line x1="${padding}" y1="${padding}" x2="${padding}" y2="${height - padding}"/>
+    <line x1="${width - padding}" y1="${padding}" x2="${width - padding}" y2="${height - padding}"/>
+    <!-- Горизонтальные линии -->
+    <line x1="${padding}" y1="${padding}" x2="${width - padding}" y2="${padding}"/>
+    <line x1="${padding}" y1="${height - padding}" x2="${width - padding}" y2="${height - padding}"/>
+  </g>
+  
+  <!-- Оси -->
+  <g stroke="#000" stroke-width="2">
+    <!-- Ось X -->
+    <line x1="${padding}" y1="${height - padding}" x2="${width - padding}" y2="${height - padding}"/>
+    <!-- Ось Y -->
+    <line x1="${padding}" y1="${padding}" x2="${padding}" y2="${height - padding}"/>
+  </g>
+  
+  <!-- Подписи осей -->
+  <text x="${width / 2}" y="${height - 10}" text-anchor="middle" font-family="Arial" font-size="12" fill="#333">
+    ${options.xLabel || 'Производительность, м³/ч'}
+  </text>
+  <text x="15" y="${height / 2}" text-anchor="middle" transform="rotate(-90, 15, ${height / 2})" font-family="Arial" font-size="12" fill="#333">
+    ${options.yLabel || 'Давление, Па'}
+  </text>
+  
+  <!-- Заголовок -->
+  <text x="${width / 2}" y="25" text-anchor="middle" font-family="Arial" font-size="14" font-weight="bold" fill="#333">
+    ${options.title || 'Аэродинамическая характеристика'}
+  </text>`;
+  
+  // Основная характеристика вентилятора (синяя линия)
+  if (dataset1.length > 0) {
+    svg += `\n  <!-- Основная характеристика -->\n  <path d="`;
+    dataset1.forEach((point, index) => {
+      const x = scaleX(point.x);
+      const y = scaleY(point.y);
+      if (index === 0) {
+        svg += `M ${x} ${y} `;
+      } else {
+        svg += `L ${x} ${y} `;
+      }
+    });
+    svg += `" stroke="#3366cc" stroke-width="3" fill="none" stroke-linejoin="round"/>`;
+  }
+  
+  // Интерполяция (красная пунктирная линия)
+  if (dataset2.length > 0) {
+    svg += `\n  <!-- Интерполяция -->\n  <path d="`;
+    dataset2.forEach((point, index) => {
+      const x = scaleX(point.x);
+      const y = scaleY(point.y);
+      if (index === 0) {
+        svg += `M ${x} ${y} `;
+      } else {
+        svg += `L ${x} ${y} `;
+      }
+    });
+    svg += `" stroke="#dc3912" stroke-width="2" fill="none" stroke-dasharray="8,4" stroke-linejoin="round"/>`;
+  }
+  
+  // Рабочая точка (оранжевый круг)
+  if (dataset3.length > 0) {
+    dataset3.forEach(point => {
+      const x = scaleX(point.x);
+      const y = scaleY(point.y);
+      svg += `\n  <circle cx="${x}" cy="${y}" r="6" fill="#ff9900" stroke="#cc7a00" stroke-width="2"/>`;
+    });
+  }
+  
+  // Заданная точка (зеленый квадрат)
+  if (dataset4.length > 0) {
+    dataset4.forEach(point => {
+      const x = scaleX(point.x);
+      const y = scaleY(point.y);
+      svg += `\n  <rect x="${x - 5}" y="${y - 5}" width="10" height="10" fill="#109618" stroke="#0d7512" stroke-width="2"/>`;
+    });
+  }
+  
+  // Легенда
+  svg += `\n  <!-- Легенда -->\n  <g font-family="Arial" font-size="11">`;
+  
+  const legendItems = [
+    { color: '#3366cc', text: 'Характеристика вентилятора', y: 45 },
+    { color: '#dc3912', text: 'Интерполяция', y: 65 },
+    { color: '#ff9900', text: 'Рабочая точка', y: 85 },
+    { color: '#109618', text: 'Заданная точка', y: 105 }
+  ];
+  
+  legendItems.forEach(item => {
+    svg += `\n    <rect x="${width - 150}" y="${item.y - 8}" width="12" height="12" fill="${item.color}" stroke="#666" stroke-width="1"/>`;
+    svg += `\n    <text x="${width - 130}" y="${item.y}" fill="#333">${item.text}</text>`;
+  });
+  
+  svg += `\n  </g>`;
+  
+  // Деления и подписи на осях
+  svg += `\n  <!-- Деления осей -->\n  <g font-family="Arial" font-size="10" fill="#666">`;
+  
+  // Деления оси X
+  const xTicks = 5;
+  for (let i = 0; i <= xTicks; i++) {
+    const value = xMin + (xMax - xMin) * i / xTicks;
+    const x = scaleX(value);
+    svg += `\n    <line x1="${x}" y1="${height - padding}" x2="${x}" y2="${height - padding + 5}" stroke="#000" stroke-width="1"/>`;
+    svg += `\n    <text x="${x}" y="${height - padding + 18}" text-anchor="middle">${formatTickValue(value)}</text>`;
+  }
+  
+  // Деления оси Y
+  const yTicks = 5;
+  for (let i = 0; i <= yTicks; i++) {
+    const value = yMin + (yMax - yMin) * i / yTicks;
+    const y = scaleY(value);
+    svg += `\n    <line x1="${padding}" y1="${y}" x2="${padding - 5}" y2="${y}" stroke="#000" stroke-width="1"/>`;
+    svg += `\n    <text x="${padding - 10}" y="${y + 4}" text-anchor="end">${formatTickValue(value)}</text>`;
+  }
+  
+  svg += `\n  </g>\n</svg>`;
+  
+  // Конвертируем SVG в base64
+  const base64SVG = Buffer.from(svg).toString('base64');
+  
+  return {
+    svg: svg,
+    base64: `data:image/svg+xml;base64,${base64SVG}`,
+    format: 'image/svg+xml',
+    width: width,
+    height: height,
+    dataRanges: {
+      x: { min: xMin, max: xMax },
+      y: { min: yMin, max: yMax }
+    }
+  };
+}
+
+// Вспомогательная функция для форматирования значений делений
+function formatTickValue(value) {
+  if (value >= 1000) {
+    return (value / 1000).toFixed(0) + 'k';
+  }
+  return Math.round(value).toString();
+}
+
+// Обновленная функция построения графиков
+async function plotTwoCurvesToJPG(dataset1, dataset2, dataset3, dataset4, outputPath, options = {}) {
+  try {
+    console.log('Создание SVG графика:', {
+      dataset1: dataset1.length,
+      dataset2: dataset2.length,
+      dataset3: dataset3.length,
+      dataset4: dataset4.length
+    });
+    
+    // Фильтруем валидные данные
+    const validDataset1 = dataset1.filter(p => p.x != null && p.y != null && !isNaN(p.x) && !isNaN(p.y));
+    const validDataset2 = dataset2.filter(p => p.x != null && p.y != null && !isNaN(p.x) && !isNaN(p.y));
+    const validDataset3 = dataset3.filter(p => p.x != null && p.y != null && !isNaN(p.x) && !isNaN(p.y));
+    const validDataset4 = dataset4.filter(p => p.x != null && p.y != null && !isNaN(p.x) && !isNaN(p.y));
+    
+    if (validDataset1.length === 0) {
+      console.error('Нет валидных данных для построения графика');
+      return {
+        success: false,
+        error: 'Нет валидных данных для построения графика'
+      };
+    }
+    
+    const graph = createSVGGraph(validDataset1, validDataset2, validDataset3, validDataset4, options);
+    
+    if (!graph) {
+      return {
+        success: false,
+        error: 'Не удалось создать график'
+      };
+    }
+    
+    return {
+      success: true,
+      graph: {
+        svg: graph.svg,
+        base64: graph.base64,
+        format: graph.format,
+        width: graph.width,
+        height: graph.height,
+        dataRanges: graph.dataRanges,
+        additionalData: {
+          pointsCount: validDataset1.length + validDataset2.length + validDataset3.length + validDataset4.length,
+          createdAt: new Date().toISOString()
+        }
+      }
+    };
+  } catch (error) {
+    console.error('Ошибка генерации SVG графика:', error);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}
+
 // Улучшенная функция генерации графиков с правильным размером
 // Исправленная функция генерации графиков с полным отображением
 async function plotTwoCurvesToJPG(dataset1, dataset2, dataset3, dataset4, outputPath, options = {}) {
