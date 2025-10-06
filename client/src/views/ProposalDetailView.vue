@@ -331,17 +331,38 @@ const loadImageAsArrayBuffer = async (imageUrl) => {
 }
 
 // Функция для конвертации SVG в PNG для PDF
+// Улучшенная функция конвертации SVG в PNG
 const convertSVGtoPNG = async (svgBase64) => {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     const img = new Image();
     img.onload = function() {
       const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      
+      // Устанавливаем размеры canvas
       canvas.width = 400;
       canvas.height = 600;
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(img, 0, 0, 400, 600);
-      resolve(canvas.toDataURL('image/png'));
+      
+      // Заливаем белым фоном
+      ctx.fillStyle = 'white';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      
+      // Рисуем изображение
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      
+      // Конвертируем в data URL
+      try {
+        const pngDataUrl = canvas.toDataURL('image/png');
+        resolve(pngDataUrl);
+      } catch (error) {
+        reject(new Error('Ошибка конвертации canvas в PNG'));
+      }
     };
+    
+    img.onerror = function() {
+      reject(new Error('Ошибка загрузки SVG изображения'));
+    };
+    
     img.src = svgBase64;
   });
 };
@@ -603,13 +624,54 @@ const generatePDF = async () => {
 
       // График аэродинамической характеристики
       if (fanData.graph?.graph?.base64) {
-        let chartImage = fanData.graph.graph.base64;
-        
-        // Если это SVG, конвертируем в PNG
-        if (fanData.graph.graph.format === 'image/svg+xml') {
-          chartImage = await convertSVGtoPNG(fanData.graph.graph.base64);
+        try {
+          let chartImage = fanData.graph.graph.base64;
+          
+          // Если это SVG, конвертируем в PNG
+          if (fanData.graph.graph.format === 'image/svg+xml') {
+            console.log('Конвертируем SVG в PNG...');
+            chartImage = await convertSVGtoPNG(fanData.graph.graph.base64);
+            console.log('Конвертация завершена');
+          }
+          
+          documentDefinition.content.push(
+            {
+              text: 'АЭРОДИНАМИЧЕСКАЯ ХАРАКТЕРИСТИКА',
+              style: 'subsectionTitle',
+              margin: [0, 10, 0, 5]
+            },
+            {
+              image: chartImage,
+              width: 350,
+              alignment: 'center',
+              margin: [0, 5, 0, 5]
+            },
+            {
+              text: `Вентилятор: ${fanData['Модель колеса']}, скорость вращения: ${fanData.speed} об/мин`,
+              style: 'noteText',
+              alignment: 'center',
+              margin: [0, 0, 0, 10]
+            }
+          );
+        } catch (error) {
+          console.error('Ошибка добавления графика в PDF:', error);
+          // Добавляем сообщение об ошибке вместо графика
+          documentDefinition.content.push(
+            {
+              text: 'АЭРОДИНАМИЧЕСКАЯ ХАРАКТЕРИСТИКА',
+              style: 'subsectionTitle',
+              margin: [0, 10, 0, 5]
+            },
+            {
+              text: 'График временно недоступен',
+              style: 'noteText',
+              alignment: 'center',
+              margin: [0, 0, 0, 10]
+            }
+          );
         }
-        
+      } else {
+        // Если графика нет
         documentDefinition.content.push(
           {
             text: 'АЭРОДИНАМИЧЕСКАЯ ХАРАКТЕРИСТИКА',
@@ -617,18 +679,12 @@ const generatePDF = async () => {
             margin: [0, 10, 0, 5]
           },
           {
-            image: chartImage,
-            width: 350,
-            alignment: 'center',
-            margin: [0, 5, 0, 5]
-          },
-          {
-            text: `Вентилятор: ${fanData['Модель колеса']}, скорость вращения: ${fanData.speed} об/мин`,
+            text: 'График не доступен',
             style: 'noteText',
             alignment: 'center',
             margin: [0, 0, 0, 10]
           }
-        )
+        );
       }
 
       // Примечание
@@ -709,12 +765,24 @@ const generatePDF = async () => {
     }
 
     // Генерируем и скачиваем PDF
-    const pdfDocGenerator = pdfMake.createPdf(documentDefinition)
-    pdfDocGenerator.download(`ТКП_${proposal.title}_${new Date().toISOString().slice(0, 10)}.pdf`)
+    console.log('Начинаем генерацию PDF...');
+    const pdfDocGenerator = pdfMake.createPdf(documentDefinition);
+    
+    pdfDocGenerator.getBlob((blob) => {
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `ТКП_${proposal.title}_${new Date().toISOString().slice(0, 10)}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      console.log('PDF успешно сгенерирован и скачан');
+    });
     
   } catch (error) {
     console.error('Ошибка генерации PDF:', error)
-    alert('Ошибка при генерации PDF файла')
+    alert('Ошибка при генерации PDF файла: ' + error.message)
   } finally {
     isGeneratingPDF.value = false
   }
