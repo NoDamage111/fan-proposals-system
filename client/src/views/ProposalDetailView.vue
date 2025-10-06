@@ -330,37 +330,38 @@ const loadImageAsArrayBuffer = async (imageUrl) => {
   }
 }
 
-// Функция для конвертации SVG в PNG для PDF
-// Улучшенная функция конвертации SVG в PNG
+// Исправленная функция конвертации SVG в PNG
 const convertSVGtoPNG = async (svgBase64) => {
   return new Promise((resolve, reject) => {
     const img = new Image();
+    img.crossOrigin = 'Anonymous';
+    
     img.onload = function() {
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
-      
-      // Устанавливаем размеры canvas
-      canvas.width = 400;
-      canvas.height = 600;
-      
-      // Заливаем белым фоном
-      ctx.fillStyle = 'white';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      
-      // Рисуем изображение
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-      
-      // Конвертируем в data URL
       try {
+        const canvas = document.createElement('canvas');
+        canvas.width = 400;
+        canvas.height = 600;
+        const ctx = canvas.getContext('2d');
+        
+        // Заливаем белым фоном
+        ctx.fillStyle = 'white';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        // Рисуем изображение
+        ctx.drawImage(img, 0, 0, 400, 600);
+        
+        // Конвертируем в data URL
         const pngDataUrl = canvas.toDataURL('image/png');
         resolve(pngDataUrl);
       } catch (error) {
-        reject(new Error('Ошибка конвертации canvas в PNG'));
+        console.error('Ошибка конвертации SVG в PNG:', error);
+        reject(error);
       }
     };
     
-    img.onerror = function() {
-      reject(new Error('Ошибка загрузки SVG изображения'));
+    img.onerror = function(error) {
+      console.error('Ошибка загрузки SVG:', error);
+      reject(new Error('Не удалось загрузить SVG изображение'));
     };
     
     img.src = svgBase64;
@@ -629,9 +630,8 @@ const generatePDF = async () => {
           
           // Если это SVG, конвертируем в PNG
           if (fanData.graph.graph.format === 'image/svg+xml') {
-            console.log('Конвертируем SVG в PNG...');
+            console.log('Конвертация SVG в PNG...');
             chartImage = await convertSVGtoPNG(fanData.graph.graph.base64);
-            console.log('Конвертация завершена');
           }
           
           documentDefinition.content.push(
@@ -655,7 +655,6 @@ const generatePDF = async () => {
           );
         } catch (error) {
           console.error('Ошибка добавления графика в PDF:', error);
-          // Добавляем сообщение об ошибке вместо графика
           documentDefinition.content.push(
             {
               text: 'АЭРОДИНАМИЧЕСКАЯ ХАРАКТЕРИСТИКА',
@@ -663,15 +662,13 @@ const generatePDF = async () => {
               margin: [0, 10, 0, 5]
             },
             {
-              text: 'График временно недоступен',
+              text: 'График недоступен для отображения в PDF',
               style: 'noteText',
-              alignment: 'center',
               margin: [0, 0, 0, 10]
             }
           );
         }
       } else {
-        // Если графика нет
         documentDefinition.content.push(
           {
             text: 'АЭРОДИНАМИЧЕСКАЯ ХАРАКТЕРИСТИКА',
@@ -681,7 +678,6 @@ const generatePDF = async () => {
           {
             text: 'График не доступен',
             style: 'noteText',
-            alignment: 'center',
             margin: [0, 0, 0, 10]
           }
         );
@@ -769,15 +765,19 @@ const generatePDF = async () => {
     const pdfDocGenerator = pdfMake.createPdf(documentDefinition);
     
     pdfDocGenerator.getBlob((blob) => {
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `ТКП_${proposal.title}_${new Date().toISOString().slice(0, 10)}.pdf`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-      console.log('PDF успешно сгенерирован и скачан');
+      console.log('PDF blob создан, размер:', blob.size);
+      if (blob.size > 0) {
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `ТКП_${proposal.title}_${new Date().toISOString().slice(0, 10)}.pdf`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      } else {
+        throw new Error('PDF файл пустой');
+      }
     });
     
   } catch (error) {
